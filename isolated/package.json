@@ -1,0 +1,22 @@
+{
+  "name": "hyperlend",
+  "version": "1.0.0",
+  "description": "A TypeScript SDK for interacting with the HyperlendPairRegistry smart contract on the Hyperliquid Testnet.",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "test": "node dist/test-sdk.js",
+    "generate-types": "typechain --target ethers-v5 'isolated/abi/*.json' --out-dir src/types"
+  },
+  "dependencies": {
+    "@typechain/ethers-v5": "^11.1.2",
+    "dotenv": "^16.4.7",
+    "ethers": "^5.7.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.1",
+    "typechain": "^8.3.2",
+    "typescript": "^5.7.3"
+  }
+}

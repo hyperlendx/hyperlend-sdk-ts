@@ -1,0 +1,35 @@
+{
+  "name": "hyperlend-sdk-core",
+  "version": "0.1.0",
+  "description": "Core SDK for interacting with Hyperlend protocol",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "ts-node src/test-sdk.ts",
+    "clean": "rimraf dist",
+    "lint": "eslint . --ext .ts",
+    "prepare": "npm run build"
+  },
+  "keywords": [
+    "defi",
+    "lending",
+    "ethereum",
+    "sdk"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "ethers": "^5.7.2",
+    "dotenv": "^16.0.3"
+  },
+  "devDependencies": {
+    "@types/node": "^18.11.18",
+    "@typescript-eslint/eslint-plugin": "^5.48.2",
+    "@typescript-eslint/parser": "^5.48.2",
+    "eslint": "^8.32.0",
+    "rimraf": "^4.1.1",
+    "ts-node": "^10.9.1",
+    "typescript": "^4.9.4"
+  }
+}
