@@ -5,9 +5,9 @@
 import { Contract, Signer, utils } from "ethers";
 import type { Provider } from "@ethersproject/providers";
 import type {
-  ProtocolDataProviderABI,
-  ProtocolDataProviderABIInterface,
-} from "../ProtocolDataProviderABI";
+  AaveProtocolDataProviderABI,
+  AaveProtocolDataProviderABIInterface,
+} from "../AaveProtocolDataProviderABI";
 
 const _abi = [
   {
@@ -552,19 +552,19 @@ const _abi = [
   },
 ] as const;
 
-export class ProtocolDataProviderABI__factory {
+export class AaveProtocolDataProviderABI__factory {
   static readonly abi = _abi;
-  static createInterface(): ProtocolDataProviderABIInterface {
-    return new utils.Interface(_abi) as ProtocolDataProviderABIInterface;
+  static createInterface(): AaveProtocolDataProviderABIInterface {
+    return new utils.Interface(_abi) as AaveProtocolDataProviderABIInterface;
   }
   static connect(
     address: string,
     signerOrProvider: Signer | Provider
-  ): ProtocolDataProviderABI {
+  ): AaveProtocolDataProviderABI {
     return new Contract(
       address,
       _abi,
       signerOrProvider
-    ) as ProtocolDataProviderABI;
+    ) as AaveProtocolDataProviderABI;
   }
 }

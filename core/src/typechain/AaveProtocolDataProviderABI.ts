@@ -28,7 +28,7 @@ export declare namespace IPoolDataProvider {
   };
 }
 
-export interface ProtocolDataProviderABIInterface extends utils.Interface {
+export interface AaveProtocolDataProviderABIInterface extends utils.Interface {
   functions: {
     "ADDRESSES_PROVIDER()": FunctionFragment;
     "getATokenTotalSupply(address)": FunctionFragment;
@@ -235,12 +235,12 @@ export interface ProtocolDataProviderABIInterface extends utils.Interface {
   events: {};
 }
 
-export interface ProtocolDataProviderABI extends BaseContract {
+export interface AaveProtocolDataProviderABI extends BaseContract {
   connect(signerOrProvider: Signer | Provider | string): this;
   attach(addressOrName: string): this;
   deployed(): Promise<this>;
 
-  interface: ProtocolDataProviderABIInterface;
+  interface: AaveProtocolDataProviderABIInterface;
 
   queryFilter<TEvent extends TypedEvent>(
     event: TypedEventFilter<TEvent>,
