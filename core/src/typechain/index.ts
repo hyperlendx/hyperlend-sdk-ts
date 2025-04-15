@@ -3,10 +3,8 @@
 /* eslint-disable */
 export type { AaveProtocolDataProviderABI } from "./AaveProtocolDataProviderABI";
 export type { UiPoolDataProviderV3ABI } from "./UiPoolDataProviderV3ABI";
-export type { AaveOracleABI } from "./AaveOracleABI";
 export type { PoolABI } from "./PoolABI";
 export * as factories from "./factories";
-export { AaveOracleABI__factory } from "./factories/AaveOracleABI__factory";
 export { AaveProtocolDataProviderABI__factory } from "./factories/AaveProtocolDataProviderABI__factory";
 export { PoolABI__factory } from "./factories/PoolABI__factory";
 export { UiPoolDataProviderV3ABI__factory } from "./factories/UiPoolDataProviderV3ABI__factory";

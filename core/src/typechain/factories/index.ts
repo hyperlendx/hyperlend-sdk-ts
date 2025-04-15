@@ -3,5 +3,4 @@
 /* eslint-disable */
 export { AaveProtocolDataProviderABI__factory } from "./AaveProtocolDataProviderABI__factory";
 export { UiPoolDataProviderV3ABI__factory } from "./UiPoolDataProviderV3ABI__factory";
-export { AaveOracleABI__factory } from "./AaveOracleABI__factory";
 export { PoolABI__factory } from "./PoolABI__factory";
