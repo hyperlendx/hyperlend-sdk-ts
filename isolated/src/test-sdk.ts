@@ -315,12 +315,64 @@ async function testTransactionFlow(
         }
     }
 
-    // Check user position after transactions (avoid duplicate output)
-    console.log("\nFinal Position After Transactions:");
-    const userPosition = await sdk.readUserPosition(PAIR_ADDRESS, wallet.address);
+    // Check user position after borrowing
+    console.log("\nChecking user position after transactions:");
+    try {
+        const userPosition = await sdk.readUserPosition(PAIR_ADDRESS, wallet.address);
+        console.log(`- Collateral Balance: ${ethers.utils.formatUnits(userPosition.userCollateralBalance, collateralDecimals)} ${collateralSymbol}`);
+        console.log(`- Borrow Shares: ${ethers.utils.formatUnits(userPosition.userBorrowShares, assetDecimals)} ${assetSymbol}`);
 
-    // Remainder of the code (repay, removeCollateral, withdraw) unchanged...
-    // ...
+        // Step 4: Repay (only if there are borrow shares)
+        if (!userPosition.userBorrowShares.isZero()) {
+            try {
+                // Repay half of the borrow
+                const repayAmount = userPosition.userBorrowShares.div(2);
+                console.log(`\nStep 4: Repaying ${ethers.utils.formatUnits(repayAmount, assetDecimals)} ${assetSymbol} borrow shares...`);
+                const repayResult = await sdk.repay(PAIR_ADDRESS, repayAmount, wallet.address, true);
+                console.log(`- Repay successful: ${repayResult.amount} ${repayResult.symbol}`);
+                console.log(`- Transaction hash: ${repayResult.transactionHash}`);
+            } catch (error) {
+                console.log(`- Repay failed: ${error instanceof Error ? error.message : String(error)}`);
+            }
+        } else {
+            console.log("\nSkipping repay step as user has no borrow shares.");
+        }
+
+        // Step 5: Remove collateral (only if there is collateral)
+        if (!userPosition.userCollateralBalance.isZero()) {
+            try {
+                // Remove half of the collateral
+                const removeAmount = userPosition.userCollateralBalance.div(2);
+                console.log(`\nStep 5: Removing ${ethers.utils.formatUnits(removeAmount, collateralDecimals)} ${collateralSymbol} collateral...`);
+                // Note: removeCollateral does not have autoApprove parameter
+                const removeResult = await sdk.removeCollateral(PAIR_ADDRESS, removeAmount, wallet.address);
+                console.log(`- Remove collateral successful: ${removeResult.amount} ${removeResult.symbol}`);
+                console.log(`- Transaction hash: ${removeResult.transactionHash}`);
+            } catch (error) {
+                console.log(`- Remove collateral failed: ${error instanceof Error ? error.message : String(error)}`);
+            }
+        } else {
+            console.log("\nSkipping remove collateral step as user has no collateral.");
+        }
+    } catch (error) {
+        console.error(`- Failed to read user position: ${error instanceof Error ? error.message : String(error)}`);
+    }
+
+    // Step 6: Withdraw assets (only if supply succeeded)
+    if (supplySuccess) {
+        try {
+            // Withdraw 10% of what was supplied to avoid issues
+            const withdrawAmount = supplyAmount.div(10);
+            console.log(`\nStep 6: Withdrawing ${ethers.utils.formatUnits(withdrawAmount, assetDecimals)} ${assetSymbol} shares...`);
+            const withdrawResult = await sdk.withdraw(PAIR_ADDRESS, withdrawAmount, wallet.address);
+            console.log(`- Withdraw successful: ${withdrawResult.amount} ${withdrawResult.symbol}`);
+            console.log(`- Transaction hash: ${withdrawResult.transactionHash}`);
+        } catch (error) {
+            console.log(`- Withdraw failed: ${error instanceof Error ? error.message : String(error)}`);
+        }
+    } else {
+        console.log("\nSkipping withdraw step due to failed supply.");
+    }
 
     console.log('\nAll transaction tests completed.');
 }
