@@ -11,7 +11,6 @@ const PRIVATE_KEY = process.env.PRIVATE_KEY!;
 const REGISTRY_ADDRESS = process.env.REGISTRY_ADDRESS!;
 const PAIR_ADDRESS = process.env.PAIR_ADDRESS!;
 const TEST_USER_ADDRESS = process.env.TEST_USER_ADDRESS!;
-const ORACLE_ADDRESS = process.env.ORACLE_ADDRESS!;
 
 async function main() {
     console.log('Starting Hyperlend SDK tests...');
@@ -295,7 +294,6 @@ async function testTransactionFlow(
                 wallet.address,
                 {
                     gasLimit: 2000000,
-                    oracleAddress: ORACLE_ADDRESS!,
                     autoApprove: true
                 }
             );

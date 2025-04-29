@@ -271,7 +271,7 @@ export class HyperlendSDK {
     async readPairData(pairAddress: string) {
         try {
             const pair = await this.getPairContract(pairAddress);
-
+            
             const [
                 asset,
                 collateral,
@@ -464,7 +464,6 @@ export class HyperlendSDK {
         userAddress: string,
         options?: {
             gasLimit?: number;
-            oracleAddress?: string;
             autoApprove?: boolean;
         }
     ) {
@@ -491,7 +490,7 @@ export class HyperlendSDK {
             }
 
             // Get oracle address from options or environment variable
-            const oracleAddress = options?.oracleAddress || process.env.ORACLE_ADDRESS;
+            const oracleAddress = (await pair.exchangeRateInfo()).oracle
             if (!oracleAddress) {
                 throw new Error("Oracle address is required for borrowing.");
             }
