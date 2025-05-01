@@ -11,7 +11,6 @@ const PRIVATE_KEY = process.env.PRIVATE_KEY!;
 const REGISTRY_ADDRESS = process.env.REGISTRY_ADDRESS!;
 const PAIR_ADDRESS = process.env.PAIR_ADDRESS!;
 const TEST_USER_ADDRESS = process.env.TEST_USER_ADDRESS!;
-const ORACLE_ADDRESS = process.env.ORACLE_ADDRESS!;
 
 async function main() {
     console.log('Starting Hyperlend SDK tests...');
@@ -33,12 +32,32 @@ async function main() {
         // Test registry functions
         await testRegistryFunctions(sdk, wallet);
 
-        // Test read functions - let SDK handle logging
+        // Test read functions - now we need to handle the returned data
         console.log('Testing Read Functions:');
-        await sdk.readPairData(PAIR_ADDRESS);
-        await sdk.readUserPosition(PAIR_ADDRESS, TEST_USER_ADDRESS);
-        await sdk.getTotalAsset(PAIR_ADDRESS);
-        await sdk.getTotalBorrow(PAIR_ADDRESS);
+        const pairData = await sdk.readPairData(PAIR_ADDRESS);
+        console.log('Pair Data:', {
+            asset: pairData.asset,
+            collateral: pairData.collateral,
+            maxLTV: pairData.maxLTV.toString(),
+            totalAssetAmount: pairData.formattedTotalAssetAmount,
+            totalBorrowAmount: pairData.formattedTotalBorrowAmount,
+            totalCollateral: pairData.formattedTotalCollateral,
+            assetSymbol: pairData.assetSymbol,
+            collateralSymbol: pairData.collateralSymbol
+        });
+
+        const userPosition = await sdk.readUserPosition(PAIR_ADDRESS, TEST_USER_ADDRESS);
+        console.log('User Position:', {
+            collateralBalance: userPosition.formattedCollateralBalance,
+            borrowShares: userPosition.formattedBorrowShares,
+            liquidationPrice: userPosition.formattedLiquidationPrice
+        });
+
+        const totalAsset = await sdk.getTotalAsset(PAIR_ADDRESS);
+        console.log('Total Asset:', totalAsset.formatted, totalAsset.symbol);
+
+        const totalBorrow = await sdk.getTotalBorrow(PAIR_ADDRESS);
+        console.log('Total Borrow:', totalBorrow.formatted, totalBorrow.symbol);
         console.log('----------------------------------');
 
         // Test user positions in detail with custom formatting
@@ -129,50 +148,12 @@ async function testUserPositions(sdk: HyperlendSDK) {
         const userPosition = await sdk.readUserPosition(PAIR_ADDRESS, TEST_USER_ADDRESS);
         const pairData = await sdk.readPairData(PAIR_ADDRESS);
 
-        // Create token contracts for fetching symbols and decimals
-        const provider = new ethers.providers.JsonRpcProvider(RPC_URL);
-
-        const assetToken = new ethers.Contract(
-            pairData.asset,
-            [
-                "function decimals() view returns (uint8)",
-                "function symbol() view returns (string)"
-            ],
-            provider
-        );
-
-        const collateralToken = new ethers.Contract(
-            pairData.collateral,
-            [
-                "function decimals() view returns (uint8)",
-                "function symbol() view returns (string)"
-            ],
-            provider
-        );
-
-        // Get token info
-        let assetSymbol = "Unknown";
-        let collateralSymbol = "Unknown";
-        let assetDecimals = 18;
-        let collateralDecimals = 18;
-
-        try {
-            [assetSymbol, collateralSymbol] = await Promise.all([
-                assetToken.symbol(),
-                collateralToken.symbol()
-            ]);
-
-            [assetDecimals, collateralDecimals] = await Promise.all([
-                assetToken.decimals(),
-                collateralToken.decimals()
-            ]);
-        } catch (error) {
-            console.warn("Could not get token info, using defaults");
-        }
-
-        // Calculate position metrics
-        const collateralBalance = ethers.utils.formatUnits(userPosition.userCollateralBalance, collateralDecimals);
-        const borrowShares = ethers.utils.formatUnits(userPosition.userBorrowShares, assetDecimals);
+        // Use the formatted data from the SDK response
+        console.log('\nUser Position Metrics:');
+        console.log(`- Address: ${TEST_USER_ADDRESS}`);
+        console.log(`- Collateral: ${userPosition.formattedCollateralBalance} ${userPosition.collateralSymbol}`);
+        console.log(`- Borrow Shares: ${userPosition.formattedBorrowShares} ${userPosition.assetSymbol}`);
+        console.log(`- Max LTV: ${(pairData.maxLTV.toNumber() / 100000 * 100).toFixed(2)}%`);
 
         // Calculate borrow capacity based on max LTV
         const maxLTV = pairData.maxLTV.toNumber() / 100000; // Convert from basis points format
@@ -180,19 +161,14 @@ async function testUserPositions(sdk: HyperlendSDK) {
             .mul(Math.floor(maxLTV * 1e5))
             .div(1e5);
 
-        console.log('\nUser Position Metrics:');
-        console.log(`- Address: ${TEST_USER_ADDRESS}`);
-        console.log(`- Collateral: ${collateralBalance} ${collateralSymbol}`);
-        console.log(`- Borrow Shares: ${borrowShares} ${assetSymbol}`);
-        console.log(`- Max LTV: ${(maxLTV * 100).toFixed(2)}%`);
-        console.log(`- Borrow Capacity: ~${ethers.utils.formatUnits(borrowCapacity, collateralDecimals)} ${assetSymbol}`);
+        console.log(`- Borrow Capacity: ~${ethers.utils.formatUnits(borrowCapacity, 18)} ${userPosition.assetSymbol}`);
 
         // Position health metrics
         if (!userPosition.userCollateralBalance.isZero() || !userPosition.userBorrowShares.isZero()) {
             console.log('\nPosition Health:');
 
             if (!userPosition.liquidationPrice.isZero() && !userPosition.userCollateralBalance.isZero()) {
-                console.log(`- Liquidation Price: ${ethers.utils.formatUnits(userPosition.liquidationPrice, 18)} ${assetSymbol}/${collateralSymbol}`);
+                console.log(`- Liquidation Price: ${userPosition.formattedLiquidationPrice} ${userPosition.assetSymbol}/${userPosition.collateralSymbol}`);
 
                 // Calculate remaining buffer before liquidation
                 const totalCollateralValue = userPosition.userCollateralBalance.mul(ethers.utils.parseUnits("1", 18));
@@ -226,35 +202,10 @@ async function testTransactionFlow(
 ) {
     console.log('Testing Transaction Flow:');
 
-    // Get token information for proper formatting
+    // Get token information from the SDK
     const pairData = await sdk.readPairData(PAIR_ADDRESS);
-    const provider = new ethers.providers.JsonRpcProvider(RPC_URL);
-
-    const assetToken = new ethers.Contract(
-        pairData.asset,
-        ["function decimals() view returns (uint8)", "function symbol() view returns (string)"],
-        provider
-    );
-
-    const collateralToken = new ethers.Contract(
-        pairData.collateral,
-        ["function decimals() view returns (uint8)", "function symbol() view returns (string)"],
-        provider
-    );
-
-    // Get token decimals and symbols
-    let assetDecimals = 18, assetSymbol = "Unknown";
-    let collateralDecimals = 18, collateralSymbol = "Unknown";
-    try {
-        [assetDecimals, assetSymbol, collateralDecimals, collateralSymbol] = await Promise.all([
-            assetToken.decimals(),
-            assetToken.symbol(),
-            collateralToken.decimals(),
-            collateralToken.symbol()
-        ]);
-    } catch (error) {
-        console.warn("Could not get token info, using defaults");
-    }
+    const assetSymbol = pairData.assetSymbol;
+    const collateralSymbol = pairData.collateralSymbol;
 
     let supplySuccess = false;
     let addCollateralSuccess = false;
@@ -262,7 +213,7 @@ async function testTransactionFlow(
 
     // Step 1: Supply assets
     try {
-        console.log(`\nStep 1: Supplying ${ethers.utils.formatUnits(supplyAmount, assetDecimals)} ${assetSymbol} to the pair...`);
+        console.log(`\nStep 1: Supplying ${ethers.utils.formatEther(supplyAmount)} ${assetSymbol} to the pair...`);
         const supplyResult = await sdk.supply(PAIR_ADDRESS, supplyAmount, wallet.address, true);
         console.log(`- Supply successful: ${supplyResult.amount} ${supplyResult.symbol}`);
         console.log(`- Transaction hash: ${supplyResult.transactionHash}`);
@@ -273,7 +224,7 @@ async function testTransactionFlow(
 
     // Step 2: Add collateral
     try {
-        console.log(`\nStep 2: Adding ${ethers.utils.formatUnits(collateralAmount, collateralDecimals)} ${collateralSymbol} collateral...`);
+        console.log(`\nStep 2: Adding ${ethers.utils.formatEther(collateralAmount)} ${collateralSymbol} collateral...`);
         const addCollateralResult = await sdk.addCollateral(PAIR_ADDRESS, collateralAmount, wallet.address, true);
         console.log(`- Add collateral successful: ${addCollateralResult.amount} ${addCollateralResult.symbol}`);
         console.log(`- Transaction hash: ${addCollateralResult.transactionHash}`);
@@ -285,7 +236,7 @@ async function testTransactionFlow(
     // Step 3: Borrow assets after collateral has already been added
     if (addCollateralSuccess) {
         try {
-            console.log(`\nStep 3: Borrowing ${ethers.utils.formatUnits(borrowAmount, assetDecimals)} ${assetSymbol}...`);
+            console.log(`\nStep 3: Borrowing ${ethers.utils.formatEther(borrowAmount)} ${assetSymbol}...`);
 
             // Collateral already exists, so pass zero as collateralAmount
             const borrowResult = await sdk.borrow(
@@ -295,7 +246,6 @@ async function testTransactionFlow(
                 wallet.address,
                 {
                     gasLimit: 2000000,
-                    oracleAddress: ORACLE_ADDRESS!,
                     autoApprove: true
                 }
             );
@@ -319,15 +269,15 @@ async function testTransactionFlow(
     console.log("\nChecking user position after transactions:");
     try {
         const userPosition = await sdk.readUserPosition(PAIR_ADDRESS, wallet.address);
-        console.log(`- Collateral Balance: ${ethers.utils.formatUnits(userPosition.userCollateralBalance, collateralDecimals)} ${collateralSymbol}`);
-        console.log(`- Borrow Shares: ${ethers.utils.formatUnits(userPosition.userBorrowShares, assetDecimals)} ${assetSymbol}`);
+        console.log(`- Collateral Balance: ${userPosition.formattedCollateralBalance} ${userPosition.collateralSymbol}`);
+        console.log(`- Borrow Shares: ${userPosition.formattedBorrowShares} ${userPosition.assetSymbol}`);
 
         // Step 4: Repay (only if there are borrow shares)
         if (!userPosition.userBorrowShares.isZero()) {
             try {
                 // Repay half of the borrow
                 const repayAmount = userPosition.userBorrowShares.div(2);
-                console.log(`\nStep 4: Repaying ${ethers.utils.formatUnits(repayAmount, assetDecimals)} ${assetSymbol} borrow shares...`);
+                console.log(`\nStep 4: Repaying ${ethers.utils.formatEther(repayAmount)} ${assetSymbol} borrow shares...`);
                 const repayResult = await sdk.repay(PAIR_ADDRESS, repayAmount, wallet.address, true);
                 console.log(`- Repay successful: ${repayResult.amount} ${repayResult.symbol}`);
                 console.log(`- Transaction hash: ${repayResult.transactionHash}`);
@@ -343,8 +293,7 @@ async function testTransactionFlow(
             try {
                 // Remove half of the collateral
                 const removeAmount = userPosition.userCollateralBalance.div(2);
-                console.log(`\nStep 5: Removing ${ethers.utils.formatUnits(removeAmount, collateralDecimals)} ${collateralSymbol} collateral...`);
-                // Note: removeCollateral does not have autoApprove parameter
+                console.log(`\nStep 5: Removing ${ethers.utils.formatEther(removeAmount)} ${userPosition.collateralSymbol} collateral...`);
                 const removeResult = await sdk.removeCollateral(PAIR_ADDRESS, removeAmount, wallet.address);
                 console.log(`- Remove collateral successful: ${removeResult.amount} ${removeResult.symbol}`);
                 console.log(`- Transaction hash: ${removeResult.transactionHash}`);
@@ -363,7 +312,7 @@ async function testTransactionFlow(
         try {
             // Withdraw 10% of what was supplied to avoid issues
             const withdrawAmount = supplyAmount.div(10);
-            console.log(`\nStep 6: Withdrawing ${ethers.utils.formatUnits(withdrawAmount, assetDecimals)} ${assetSymbol} shares...`);
+            console.log(`\nStep 6: Withdrawing ${ethers.utils.formatEther(withdrawAmount)} ${assetSymbol} shares...`);
             const withdrawResult = await sdk.withdraw(PAIR_ADDRESS, withdrawAmount, wallet.address);
             console.log(`- Withdraw successful: ${withdrawResult.amount} ${withdrawResult.symbol}`);
             console.log(`- Transaction hash: ${withdrawResult.transactionHash}`);

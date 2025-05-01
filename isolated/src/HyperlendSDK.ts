@@ -4,6 +4,59 @@ import { HyperlendPairRegistry__factory } from './types';
 import { HyperlendPair } from './types';
 import { HyperlendPair__factory } from './types';
 
+export interface TransactionResult {
+    success: boolean;
+    transactionHash: string;
+    blockNumber: number;
+    amount: string;
+    symbol: string;
+    collateral?: string;
+    collateralSymbol?: string;
+}
+
+export interface UserPosition {
+    userCollateralBalance: ethers.BigNumber;
+    userBorrowShares: ethers.BigNumber;
+    liquidationPrice: ethers.BigNumber;
+    formattedCollateralBalance: string;
+    formattedBorrowShares: string;
+    formattedLiquidationPrice: string;
+    collateralSymbol: string;
+    assetSymbol: string;
+}
+
+// Updated to match the actual contract return type
+export interface PairData {
+    asset: string;
+    collateral: string;
+    maxLTV: ethers.BigNumber;
+    cleanLiquidationFee: ethers.BigNumber;
+    dirtyLiquidationFee: ethers.BigNumber;
+    protocolLiquidationFee: ethers.BigNumber;
+    totalAssetAmount: ethers.BigNumber;
+    totalBorrowAmount: ethers.BigNumber;
+    totalCollateral: ethers.BigNumber;
+    currentRateInfo: {
+        lastBlock: number;
+        feeToProtocolRate: number;
+        lastTimestamp: ethers.BigNumber;
+        ratePerSec: ethers.BigNumber;
+        fullUtilizationRate: ethers.BigNumber;
+    };
+    formattedTotalAssetAmount: string;
+    formattedTotalBorrowAmount: string;
+    formattedTotalCollateral: string;
+    assetSymbol: string;
+    collateralSymbol: string;
+}
+
+export interface ApprovalResult {
+    approved: boolean;
+    transactionHash?: string;
+    amount: string;
+    symbol: string;
+}
+
 export class HyperlendSDK {
     private registry: HyperlendPairRegistry;
     private providerOrSigner: ethers.providers.Provider | ethers.Signer;
@@ -38,7 +91,6 @@ export class HyperlendSDK {
             ]);
             return { decimals, symbol };
         } catch (error) {
-            console.warn("Could not get token info, using defaults:", error);
             return { decimals: 18, symbol: "Unknown" };
         }
     }
@@ -97,8 +149,9 @@ export class HyperlendSDK {
         spender: string,
         amount: ethers.BigNumber,
         autoApprove: boolean
-    ): Promise<void> {
+    ): Promise<ApprovalResult> {
         const tokenContract = this.getTokenContract(tokenAddress, true);
+        const tokenInfo = await this.getTokenInfo(tokenAddress);
         const allowance = await tokenContract.allowance(await this.getSignerAddress(), spender);
 
         if (allowance.lt(amount)) {
@@ -106,26 +159,31 @@ export class HyperlendSDK {
                 throw new Error(`Insufficient allowance. Approve tokens manually or set autoApprove=true.`);
             }
 
-            const tokenInfo = await this.getTokenInfo(tokenAddress);
-            console.log(`Approving ${this.formatTokenAmount(amount, tokenInfo.decimals, tokenInfo.symbol)}...`);
-
             // Estimate gas for approval
             let approvalGasLimit: number;
             try {
                 const approvalGasEstimate = await tokenContract.estimateGas.approve(spender, amount);
                 approvalGasLimit = Math.ceil(approvalGasEstimate.toNumber() * 1.2); // Add 20% buffer
             } catch (error) {
-                console.warn("Approval gas estimation failed, using default gas limit.");
                 approvalGasLimit = 50000;
             }
 
             const tx = await tokenContract.approve(spender, amount, { gasLimit: approvalGasLimit });
-            console.log(`Approval transaction sent: ${tx.hash}`);
             await tx.wait();
-            console.log(`Tokens approved successfully.`);
-        } else {
-            console.log(`Sufficient allowance already exists.`);
+
+            return {
+                approved: true,
+                transactionHash: tx.hash,
+                amount: this.formatTokenAmount(amount, tokenInfo.decimals),
+                symbol: tokenInfo.symbol
+            };
         }
+
+        return {
+            approved: false,
+            amount: this.formatTokenAmount(amount, tokenInfo.decimals),
+            symbol: tokenInfo.symbol
+        };
     }
 
     /**
@@ -140,13 +198,12 @@ export class HyperlendSDK {
             const gasEstimate = await transaction();
             return Math.ceil(gasEstimate.toNumber() * bufferMultiplier);
         } catch (error) {
-            console.warn(`Gas estimation failed, using default gas limit.`);
             return 300000; // Default fallback gas limit
         }
     }
 
     /**
-     * Handles errors gracefully by decoding and logging them.
+     * Handles errors gracefully by decoding them.
      * @param error The error object.
      * @returns A string representation of the error.
      */
@@ -167,16 +224,15 @@ export class HyperlendSDK {
     }
 
     /**
-     * Handle transaction errors by decoding and logging them.
+     * Handle transaction errors by decoding them.
      * @param error The error object.
      */
-    private handleTransactionError(error: any): void {
+    private handleTransactionError(error: any): never {
         if (error.code === ethers.errors.CALL_EXCEPTION) {
-            console.error('Transaction failed:', error.reason);
+            throw new Error(`Transaction failed: ${error.reason || error.message}`);
         } else {
-            console.error('Unexpected error:', error);
+            throw error;
         }
-        throw error; // Re-throw the error after logging
     }
 
     /**
@@ -209,7 +265,7 @@ export class HyperlendSDK {
         return await this.registry.getAllPairAddresses();
     }
 
-    async addPair(pairAddress: string, signer: ethers.Signer, overrides?: ethers.Overrides): Promise<void> {
+    async addPair(pairAddress: string, signer: ethers.Signer, overrides?: ethers.Overrides): Promise<{transactionHash: string}> {
         if (!ethers.Signer.isSigner(signer)) {
             throw new Error('A valid Signer is required to add a pair.');
         }
@@ -219,15 +275,14 @@ export class HyperlendSDK {
         const contractWithSigner = this.registry.connect(signer);
         try {
             const tx = await contractWithSigner.addPair(pairAddress, overrides || {});
-            console.log(`Transaction sent: ${tx.hash}`);
             await tx.wait();
-            console.log(`Pair added successfully: ${pairAddress}`);
+            return { transactionHash: tx.hash };
         } catch (error) {
             this.handleTransactionError(error);
         }
     }
 
-    async setDeployers(deployers: string[], allow: boolean, signer: ethers.Signer, overrides?: ethers.Overrides): Promise<void> {
+    async setDeployers(deployers: string[], allow: boolean, signer: ethers.Signer, overrides?: ethers.Overrides): Promise<{transactionHash: string}> {
         if (!ethers.Signer.isSigner(signer)) {
             throw new Error('A valid Signer is required to set deployers.');
         }
@@ -237,9 +292,8 @@ export class HyperlendSDK {
         const contractWithSigner = this.registry.connect(signer);
         try {
             const tx = await contractWithSigner.setDeployers(deployers, allow, overrides || {});
-            console.log(`Transaction sent: ${tx.hash}`);
             await tx.wait();
-            console.log(`Deployers updated successfully.`);
+            return { transactionHash: tx.hash };
         } catch (error) {
             this.handleTransactionError(error);
         }
@@ -268,7 +322,7 @@ export class HyperlendSDK {
      * @param pairAddress Address of the pair contract.
      * @returns Pair data including asset, collateral, LTV, fees, total assets, total borrows, etc.
      */
-    async readPairData(pairAddress: string) {
+    async readPairData(pairAddress: string): Promise<PairData> {
         try {
             const pair = await this.getPairContract(pairAddress);
 
@@ -296,6 +350,10 @@ export class HyperlendSDK {
                 pair.currentRateInfo(),
             ]);
 
+            // Get token information
+            const assetInfo = await this.getTokenInfo(asset);
+            const collateralInfo = await this.getTokenInfo(collateral);
+
             return {
                 asset,
                 collateral,
@@ -306,7 +364,12 @@ export class HyperlendSDK {
                 totalAssetAmount,
                 totalBorrowAmount,
                 totalCollateral,
-                currentRateInfo,
+                currentRateInfo, // Now matches the actual contract return type
+                formattedTotalAssetAmount: this.formatTokenAmount(totalAssetAmount, assetInfo.decimals),
+                formattedTotalBorrowAmount: this.formatTokenAmount(totalBorrowAmount, assetInfo.decimals),
+                formattedTotalCollateral: this.formatTokenAmount(totalCollateral, collateralInfo.decimals),
+                assetSymbol: assetInfo.symbol,
+                collateralSymbol: collateralInfo.symbol
             };
         } catch (error) {
             throw new Error(`Failed to read pair data: ${this.handleError(error)}`);
@@ -323,7 +386,7 @@ export class HyperlendSDK {
      * @param userAddress Address of the user.
      * @returns User's collateral balance, borrowed shares, liquidation price, etc.
      */
-    async readUserPosition(pairAddress: string, userAddress: string) {
+    async readUserPosition(pairAddress: string, userAddress: string): Promise<UserPosition> {
         try {
             const pair = await this.getPairContract(pairAddress);
 
@@ -352,14 +415,15 @@ export class HyperlendSDK {
                     ? userBorrowShares.mul(exchangeRateInfo.lowExchangeRate).div(userCollateralBalance)
                     : ethers.BigNumber.from(0);
 
-            console.log(`User collateral balance: ${this.formatTokenAmount(userCollateralBalance, collateralInfo.decimals, collateralInfo.symbol)}`);
-            console.log(`User borrow shares: ${this.formatTokenAmount(userBorrowShares, assetInfo.decimals, assetInfo.symbol)}`);
-            console.log(`Liquidation price: ${this.formatTokenAmount(liquidationPrice, 18, `${assetInfo.symbol}/${collateralInfo.symbol}`)}`);
-
             return {
                 userCollateralBalance,
                 userBorrowShares,
                 liquidationPrice,
+                formattedCollateralBalance: this.formatTokenAmount(userCollateralBalance, collateralInfo.decimals),
+                formattedBorrowShares: this.formatTokenAmount(userBorrowShares, assetInfo.decimals),
+                formattedLiquidationPrice: this.formatTokenAmount(liquidationPrice, 18),
+                collateralSymbol: collateralInfo.symbol,
+                assetSymbol: assetInfo.symbol
             };
         } catch (error) {
             throw new Error(`Failed to read user position: ${this.handleError(error)}`);
@@ -370,7 +434,7 @@ export class HyperlendSDK {
     // Total Asset and Total Borrow Getters
     // ===============================
 
-    async getTotalAsset(pairAddress: string): Promise<ethers.BigNumber> {
+    async getTotalAsset(pairAddress: string): Promise<{totalAssets: ethers.BigNumber, formatted: string, symbol: string}> {
         try {
             const pair = await this.getPairContract(pairAddress);
             const totalAssets = await pair.totalAssets();
@@ -379,14 +443,17 @@ export class HyperlendSDK {
             const assetTokenAddress = await pair.asset();
             const assetInfo = await this.getTokenInfo(assetTokenAddress);
 
-            console.log(`Total assets: ${this.formatTokenAmount(totalAssets, assetInfo.decimals, assetInfo.symbol)}`);
-            return totalAssets;
+            return {
+                totalAssets,
+                formatted: this.formatTokenAmount(totalAssets, assetInfo.decimals),
+                symbol: assetInfo.symbol
+            };
         } catch (error) {
             throw new Error(`Failed to get total asset: ${this.handleError(error)}`);
         }
     }
 
-    async getTotalBorrow(pairAddress: string): Promise<ethers.BigNumber> {
+    async getTotalBorrow(pairAddress: string): Promise<{totalBorrow: ethers.BigNumber, formatted: string, symbol: string}> {
         try {
             const pair = await this.getPairContract(pairAddress);
             const totalBorrowAmount = await pair.totalBorrow().then((borrow) => borrow.amount);
@@ -395,8 +462,11 @@ export class HyperlendSDK {
             const assetTokenAddress = await pair.asset();
             const assetInfo = await this.getTokenInfo(assetTokenAddress);
 
-            console.log(`Total borrow: ${this.formatTokenAmount(totalBorrowAmount, assetInfo.decimals, assetInfo.symbol)}`);
-            return totalBorrowAmount;
+            return {
+                totalBorrow: totalBorrowAmount,
+                formatted: this.formatTokenAmount(totalBorrowAmount, assetInfo.decimals),
+                symbol: assetInfo.symbol
+            };
         } catch (error) {
             throw new Error(`Failed to get total borrow: ${this.handleError(error)}`);
         }
@@ -418,23 +488,20 @@ export class HyperlendSDK {
         amount: ethers.BigNumber,
         userAddress: string,
         autoApprove: boolean = true
-    ) {
+    ): Promise<TransactionResult> {
         try {
             const pair = await this.getPairContract(pairAddress);
             const assetTokenAddress = await pair.asset();
             const assetInfo = await this.getTokenInfo(assetTokenAddress);
 
-            await this.approveTokenIfNeeded(assetTokenAddress, pairAddress, amount, autoApprove);
+            const approvalResult = await this.approveTokenIfNeeded(assetTokenAddress, pairAddress, amount, autoApprove);
 
             const gasLimit = await this.estimateGasWithBuffer(
                 () => pair.estimateGas.deposit(amount, userAddress)
             );
 
-            console.log(`Supplying ${this.formatTokenAmount(amount, assetInfo.decimals, assetInfo.symbol)}...`);
             const tx = await pair.deposit(amount, userAddress, { gasLimit });
-            console.log(`Transaction sent: ${tx.hash}`);
             const receipt = await tx.wait();
-            console.log(`Supplied successfully: ${this.formatTokenAmount(amount, assetInfo.decimals, assetInfo.symbol)}`);
 
             return {
                 success: true,
@@ -445,7 +512,6 @@ export class HyperlendSDK {
             };
         } catch (error) {
             this.handleTransactionError(error);
-            throw error;
         }
     }
 
@@ -464,10 +530,9 @@ export class HyperlendSDK {
         userAddress: string,
         options?: {
             gasLimit?: number;
-            oracleAddress?: string;
             autoApprove?: boolean;
         }
-    ) {
+    ): Promise<TransactionResult> {
         try {
             if (amount.lte(0)) throw new Error("Borrow amount must be greater than zero");
 
@@ -481,8 +546,9 @@ export class HyperlendSDK {
             const collateralInfo = await this.getTokenInfo(collateralTokenAddress);
 
             // If adding collateral as part of the borrow operation
+            let approvalResult;
             if (collateralAmount.gt(0)) {
-                await this.approveTokenIfNeeded(
+                approvalResult = await this.approveTokenIfNeeded(
                     collateralTokenAddress,
                     pairAddress,
                     collateralAmount,
@@ -490,10 +556,10 @@ export class HyperlendSDK {
                 );
             }
 
-            // Get oracle address from options or environment variable
-            const oracleAddress = options?.oracleAddress || process.env.ORACLE_ADDRESS;
+            // Get oracle address directly from the pair contract
+            const oracleAddress = (await pair.exchangeRateInfo()).oracle;
             if (!oracleAddress) {
-                throw new Error("Oracle address is required for borrowing.");
+                throw new Error("Oracle address not found in pair contract.");
             }
 
             // Create Oracle contract interface
@@ -515,11 +581,8 @@ export class HyperlendSDK {
                 1.5 // 50% buffer for borrow operations
             );
 
-            console.log(`Borrowing ${this.formatTokenAmount(amount, assetInfo.decimals, assetInfo.symbol)}...`);
             const tx = await pair.borrowAsset(amount, collateralAmount, userAddress, { gasLimit });
-            console.log(`Transaction sent: ${tx.hash}`);
             const receipt = await tx.wait();
-            console.log(`Borrowed successfully: ${this.formatTokenAmount(amount, assetInfo.decimals, assetInfo.symbol)}`);
 
             return {
                 success: true,
@@ -532,7 +595,6 @@ export class HyperlendSDK {
             };
         } catch (error) {
             this.handleTransactionError(error);
-            throw error;
         }
     }
 
@@ -546,7 +608,7 @@ export class HyperlendSDK {
         pairAddress: string,
         shares: ethers.BigNumber,
         userAddress: string
-    ) {
+    ): Promise<TransactionResult> {
         try {
             if (shares.lte(0)) throw new Error("Shares amount must be greater than zero");
 
@@ -558,11 +620,8 @@ export class HyperlendSDK {
                 () => pair.estimateGas.withdraw(shares, userAddress, userAddress)
             );
 
-            console.log(`Withdrawing ${this.formatTokenAmount(shares, assetInfo.decimals, assetInfo.symbol)} shares...`);
             const tx = await pair.withdraw(shares, userAddress, userAddress, { gasLimit });
-            console.log(`Transaction sent: ${tx.hash}`);
             const receipt = await tx.wait();
-            console.log(`Withdrawn successfully: ${this.formatTokenAmount(shares, assetInfo.decimals, assetInfo.symbol)}`);
 
             return {
                 success: true,
@@ -573,7 +632,6 @@ export class HyperlendSDK {
             };
         } catch (error) {
             this.handleTransactionError(error);
-            throw error;
         }
     }
 
@@ -589,7 +647,7 @@ export class HyperlendSDK {
         shares: ethers.BigNumber,
         userAddress: string,
         autoApprove: boolean = true
-    ) {
+    ): Promise<TransactionResult> {
         try {
             if (shares.lte(0)) throw new Error("Shares must be greater than zero");
             if (!this.isValidAddress(userAddress)) throw new Error("Invalid user address");
@@ -611,18 +669,15 @@ export class HyperlendSDK {
             const totalBorrow = await pair.totalBorrow();
             const amountToRepay = shares.mul(totalBorrow.amount).div(totalBorrow.shares);
 
-            await this.approveTokenIfNeeded(assetTokenAddress, pairAddress, amountToRepay, autoApprove);
+            const approvalResult = await this.approveTokenIfNeeded(assetTokenAddress, pairAddress, amountToRepay, autoApprove);
 
             const gasLimit = await this.estimateGasWithBuffer(
                 () => pair.estimateGas.repayAsset(shares, userAddress),
                 1.5 // 50% buffer for repay operations
             );
 
-            console.log(`Repaying ${this.formatTokenAmount(shares, assetInfo.decimals, assetInfo.symbol)} shares...`);
             const tx = await pair.repayAsset(shares, userAddress, { gasLimit });
-            console.log(`Transaction sent: ${tx.hash}`);
             const receipt = await tx.wait();
-            console.log(`Repaid successfully: ${this.formatTokenAmount(shares, assetInfo.decimals, assetInfo.symbol)}`);
 
             return {
                 success: true,
@@ -633,7 +688,6 @@ export class HyperlendSDK {
             };
         } catch (error) {
             this.handleTransactionError(error);
-            throw error;
         }
     }
 
@@ -649,7 +703,7 @@ export class HyperlendSDK {
         amount: ethers.BigNumber,
         userAddress: string,
         autoApprove: boolean = true
-    ) {
+    ): Promise<TransactionResult> {
         try {
             if (amount.lte(0)) throw new Error("Collateral amount must be greater than zero");
             if (!this.isValidAddress(userAddress)) throw new Error("Invalid user address");
@@ -667,17 +721,14 @@ export class HyperlendSDK {
                 throw new Error(`Insufficient collateral balance`);
             }
 
-            await this.approveTokenIfNeeded(collateralTokenAddress, pairAddress, amount, autoApprove);
+            const approvalResult = await this.approveTokenIfNeeded(collateralTokenAddress, pairAddress, amount, autoApprove);
 
             const gasLimit = await this.estimateGasWithBuffer(
                 () => pair.estimateGas.addCollateral(amount, userAddress)
             );
 
-            console.log(`Adding ${this.formatTokenAmount(amount, collateralInfo.decimals, collateralInfo.symbol)} collateral...`);
             const tx = await pair.addCollateral(amount, userAddress, { gasLimit });
-            console.log(`Transaction sent: ${tx.hash}`);
             const receipt = await tx.wait();
-            console.log(`Added collateral successfully: ${this.formatTokenAmount(amount, collateralInfo.decimals, collateralInfo.symbol)}`);
 
             return {
                 success: true,
@@ -688,7 +739,6 @@ export class HyperlendSDK {
             };
         } catch (error) {
             this.handleTransactionError(error);
-            throw error;
         }
     }
 
@@ -702,7 +752,7 @@ export class HyperlendSDK {
         pairAddress: string,
         amount: ethers.BigNumber,
         userAddress: string
-    ) {
+    ): Promise<TransactionResult> {
         try {
             if (amount.lte(0)) throw new Error("Collateral amount must be greater than zero");
 
@@ -714,11 +764,8 @@ export class HyperlendSDK {
                 () => pair.estimateGas.removeCollateral(amount, userAddress)
             );
 
-            console.log(`Removing ${this.formatTokenAmount(amount, collateralInfo.decimals, collateralInfo.symbol)} collateral...`);
             const tx = await pair.removeCollateral(amount, userAddress, { gasLimit });
-            console.log(`Transaction sent: ${tx.hash}`);
             const receipt = await tx.wait();
-            console.log(`Collateral removed successfully: ${this.formatTokenAmount(amount, collateralInfo.decimals, collateralInfo.symbol)}`);
 
             return {
                 success: true,
@@ -729,7 +776,6 @@ export class HyperlendSDK {
             };
         } catch (error) {
             this.handleTransactionError(error);
-            throw error;
         }
     }
 }
