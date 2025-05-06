@@ -1,6 +1,10 @@
 # HyperLend SDK Core
 
-A comprehensive TypeScript/JavaScript SDK for interacting with the HyperLend protocol on the HyperLiquid blockchain. This core module provides direct access to lending and borrowing functionalities through a simple, type-safe API.
+A comprehensive TypeScript/JavaScript SDK for interacting with the HyperLend protocol on the Hyperliquid EVM blockchain. This core module provides direct access to lending and borrowing functionalities through a simple, type-safe API.
+
+## HyperLend Mainnet Contracts
+
+All addresses can be found at https://docs.hyperlend.finance/developer-documentation/contract-addresses
 
 ## Table of Contents
 
