@@ -1,7 +1,7 @@
 {
-  "name": "hyperlend",
+  "name": "hyperlend-isolated",
   "version": "1.0.0",
-  "description": "A TypeScript SDK for interacting with the HyperlendPairRegistry smart contract on the Hyperliquid Testnet.",
+  "description": "A SDK for interacting with the HyperLend Isolated markets",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",

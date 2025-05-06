@@ -1,7 +1,7 @@
 {
-  "name": "hyperlend-sdk-core",
+  "name": "hyperlend-core",
   "version": "0.1.0",
-  "description": "SDK for interacting with HyperLend Core markets",
+  "description": "A SDK for interacting with HyperLend Core markets",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
@@ -15,7 +15,9 @@
     "defi",
     "lending",
     "ethereum",
-    "sdk"
+    "sdk",
+    "hyperlend",
+    "hyperliquid"
   ],
   "author": "",
   "license": "MIT",
