@@ -852,7 +852,6 @@ export interface PoolABIInterface extends utils.Interface {
     "MintedToTreasury(address,uint256)": EventFragment;
     "Repay(address,address,address,uint256,bool)": EventFragment;
     "ReserveDataUpdated(address,uint256,uint256,uint256,uint256,uint256)": EventFragment;
-    "ReserveDataUpdated(address,uint256,uint256,uint256,uint256,uint256)": EventFragment;
     "ReserveUsedAsCollateralDisabled(address,address)": EventFragment;
     "ReserveUsedAsCollateralEnabled(address,address)": EventFragment;
     "Supply(address,address,address,uint256,uint16)": EventFragment;
@@ -1025,14 +1024,6 @@ export interface ReserveDataUpdated_address_uint256_uint256_uint256_uint256_uint
   liquidityIndex: BigNumber;
   variableBorrowIndex: BigNumber;
 }
-export type ReserveDataUpdated_address_uint256_uint256_uint256_uint256_uint256_Event =
-  TypedEvent<
-    [string, BigNumber, BigNumber, BigNumber, BigNumber, BigNumber],
-    ReserveDataUpdated_address_uint256_uint256_uint256_uint256_uint256_EventObject
-  >;
-
-export type ReserveDataUpdated_address_uint256_uint256_uint256_uint256_uint256_EventFilter =
-  TypedEventFilter<ReserveDataUpdated_address_uint256_uint256_uint256_uint256_uint256_Event>;
 
 export interface ReserveUsedAsCollateralDisabledEventObject {
   reserve: string;
