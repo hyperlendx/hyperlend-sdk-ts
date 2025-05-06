@@ -1,4 +1,4 @@
-# HyperLendSDK
+# HyperLend SDK
 
 A comprehensive TypeScript SDK for interacting with the HyperLend protocol - a decentralized lending and borrowing platform on the Hyperliquid EVM blockchain.
 
