@@ -22,7 +22,7 @@
 ## Installation
 
 ```bash
-npm install hyperlend-isolated
+npm install hyperlend-isolated-sdk
 ```
 
 ## Initialization
@@ -32,7 +32,7 @@ The SDK can be initialized in two modes:
 ### Read-Only Mode
 
 ```typescript
-import { HyperlendSDK } from 'hyperlend-isolated';
+import { HyperlendSDK } from 'hyperlend-isolated-sdk';
 import { ethers } from 'ethers';
 
 // Initialize with provider (read-only mode)
@@ -43,7 +43,7 @@ const sdkReadOnly = new HyperlendSDK(provider, 'REGISTRY_ADDRESS');
 ### Transaction Mode (with Signer)
 
 ```typescript
-import { HyperlendSDK } from 'hyperlend-isolated';
+import { HyperlendSDK } from 'hyperlend-isolated-sdk';
 import { ethers } from 'ethers';
 
 // Initialize with signer (transaction mode)

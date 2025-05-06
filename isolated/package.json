@@ -1,5 +1,5 @@
 {
-  "name": "hyperlend-isolated",
+  "name": "hyperlend-isolated-sdk",
   "version": "1.0.0",
   "description": "A SDK for interacting with the HyperLend Isolated markets",
   "main": "dist/index.js",
