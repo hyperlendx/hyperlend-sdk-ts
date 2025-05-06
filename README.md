@@ -12,19 +12,19 @@ HyperLendSDK provides a simple interface to integrate HyperLend's lending functi
 ## Installation
 
 ```bash
-npm install HyperLend-sdk
+npm install hyperlend-sdk
 ```
 
 Or with yarn:
 
 ```bash
-yarn add HyperLend-sdk
+yarn add hyperlend-sdk
 ```
 
 ## Quick Start
 
 ```typescript
-import { HyperLendSDK } from 'HyperLend-sdk';
+import { HyperLendSDK } from 'hyperlend-sdk';
 import { ethers } from 'ethers';
 
 // Initialize with provider (read-only mode)
@@ -69,7 +69,7 @@ The Isolated module handles specialized pair-based lending markets:
 ## Project Structure
 
 ```
-HyperLend-sdk/
+hyperlend-sdk/
 ├── core/                   # Core lending protocol functionality
 │   ├── abi/                # ABI files for core contracts
 │   ├── src/                # Source code
@@ -100,7 +100,7 @@ HyperLend-sdk/
 
 ```bash
 # Clone the repository
-git clone https://github.com/HyperLend/HyperLend-sdk.git
+git clone https://github.com/HyperLend/hyperlend-sdk.git
 
 # Install dependencies
 npm install
