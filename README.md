@@ -57,11 +57,12 @@ The Core module provides access to the main Hyperlend protocol features:
 
 The Isolated module handles specialized pair-based lending markets:
 
-- Pair registry management
-- Position management for pair-based lending
-- Supply, borrow, repay, and withdraw operations for isolated markets
-- Collateral management for isolated positions
-- Oracle integration for price feeds
+- Pair registry management and queries
+- Position management with detailed user metrics
+- Supply, borrow, repay, and withdraw operations with proper decimal handling
+- Collateral management with automatic approval handling
+- Oracle integration for price feeds and liquidation price calculations
+- Gas optimization with configurable buffer settings
 
 [**Isolated Module Documentation →**](./isolated/README.md)
 
