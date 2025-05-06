@@ -350,49 +350,6 @@ const _abi = [
         type: "address",
       },
       {
-        indexed: false,
-        internalType: "uint256",
-        name: "liquidityRate",
-        type: "uint256",
-      },
-      {
-        indexed: false,
-        internalType: "uint256",
-        name: "stableBorrowRate",
-        type: "uint256",
-      },
-      {
-        indexed: false,
-        internalType: "uint256",
-        name: "variableBorrowRate",
-        type: "uint256",
-      },
-      {
-        indexed: false,
-        internalType: "uint256",
-        name: "liquidityIndex",
-        type: "uint256",
-      },
-      {
-        indexed: false,
-        internalType: "uint256",
-        name: "variableBorrowIndex",
-        type: "uint256",
-      },
-    ],
-    name: "ReserveDataUpdated",
-    type: "event",
-  },
-  {
-    anonymous: false,
-    inputs: [
-      {
-        indexed: true,
-        internalType: "address",
-        name: "reserve",
-        type: "address",
-      },
-      {
         indexed: true,
         internalType: "address",
         name: "user",
