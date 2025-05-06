@@ -1,5 +1,5 @@
 {
-  "name": "hyperlend-core",
+  "name": "hyperlend-sdk",
   "version": "0.1.0",
   "description": "A SDK for interacting with HyperLend Core markets",
   "main": "dist/index.js",
