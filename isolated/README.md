@@ -1,33 +1,35 @@
 # HyperLend SDK - Isolated Module
 
-## Overview
+## Table of Contents
 
-The HyperLend Isolated SDK is a comprehensive TypeScript library for interacting with HyperLend's isolated lending markets on the HyperLiquid blockchain. This module provides developers with a streamlined interface to connect with pair-based lending/borrowing protocols where each lending pair operates independently with dedicated parameters and risk profiles.
-
-The SDK handles all blockchain interactions, token approvals, gas estimations, and data formatting, allowing developers to focus on building applications instead of managing low-level contract interactions.
+- [Installation](#installation)
+- [Initialization](#initialization)
+- [Key Features](#key-features)
+- [Usage Examples](#usage-examples)
+   - [Querying Pair Registry Data](#querying-pair-registry-data)
+   - [Supply and Borrow Operations](#supply-and-borrow-operations)
+   - [Managing Collateral](#managing-collateral)
+   - [Reading User Positions](#reading-user-positions)
+- [API Reference](#api-reference)
+   - [Pair Registry Functions](#pair-registry-functions)
+   - [Pair Data Functions](#pair-data-functions)
+   - [User Position Functions](#user-position-functions)
+- [Return Types](#return-types)
+- [Error Handling](#error-handling)
+- [Development](#development)
+- [Troubleshooting](#troubleshooting)
 
 ## Installation
-
-### Using npm
 
 ```bash
 npm install @hyperlend/isolated-sdk
 ```
 
-### Using yarn
-
-```bash
-yarn add @hyperlend/isolated-sdk
-```
-
-### Requirements
-
-- Node.js 14.x or higher
-- ethers.js v5.x
-
 ## Initialization
 
-The SDK can be initialized in either read-only mode (using a provider) or transaction mode (using a signer).
+The SDK can be initialized in two modes:
+
+### Read-Only Mode
 
 ```typescript
 import { HyperlendSDK } from '@hyperlend/isolated-sdk';
@@ -36,23 +38,30 @@ import { ethers } from 'ethers';
 // Initialize with provider (read-only mode)
 const provider = new ethers.providers.JsonRpcProvider('RPC_ENDPOINT');
 const sdkReadOnly = new HyperlendSDK(provider, 'REGISTRY_ADDRESS');
+```
+
+### Transaction Mode (with Signer)
+
+```typescript
+import { HyperlendSDK } from '@hyperlend/isolated-sdk';
+import { ethers } from 'ethers';
 
 // Initialize with signer (transaction mode)
 const privateKey = process.env.PRIVATE_KEY;
+const provider = new ethers.providers.JsonRpcProvider('RPC_ENDPOINT');
 const signer = new ethers.Wallet(privateKey, provider);
 const sdk = new HyperlendSDK(signer, 'REGISTRY_ADDRESS');
 ```
 
 ## Key Features
 
-- **Pair Registry Management**: Query and manage lending pairs in the system
-- **Position Management**: Supply, borrow, withdraw, and repay assets with configurable parameters
-- **Collateral Management**: Add and remove collateral from positions with automatic approval handling
-- **Data Access**: Query pair and user position data with detailed metrics
-- **Oracle Integration**: Handle price feed data for liquidation calculations and risk assessment
+- **Pair Registry Management**: Query and manage lending pairs with separate risk profiles
+- **Position Management**: Supply, borrow, withdraw, and repay operations for isolated markets
+- **Collateral Management**: Add and remove collateral with automatic approval handling
+- **Data Access**: Query pair and user position data with formatted metrics
+- **Oracle Integration**: Automatic price feed data handling for liquidation calculations
 - **Gas Optimization**: Automatic gas limit estimation with configurable buffer
-- **Error Handling**: Comprehensive error handling with detailed error messages
-- **Transaction Results**: Structured transaction results with formatted values and transaction hashes
+- **Error Handling**: Comprehensive validation and detailed error messages
 
 ## Usage Examples
 
@@ -66,14 +75,12 @@ console.log(`Found ${pairAddresses.length} lending pairs`);
 // Get detailed data for a specific pair
 const pairData = await sdk.readPairData(pairAddresses[0]);
 console.log('Pair data:', {
-  asset: pairData.asset,
-  collateral: pairData.collateral,
-  maxLTV: pairData.maxLTV.toString(),
-  totalAssetAmount: ethers.utils.formatEther(pairData.totalAssetAmount)
+  asset: pairData.assetSymbol,
+  collateral: pairData.collateralSymbol,
+  maxLTV: ethers.utils.formatUnits(pairData.maxLTV, 0),
+  totalAssets: pairData.formattedTotalAssetAmount,
+  totalBorrows: pairData.formattedTotalBorrowAmount
 });
-
-// Get pair address by name
-const pairByName = await sdk.getPairAddressByName('PairName');
 
 // Check if an address is an authorized deployer
 const isDeployer = await sdk.isDeployer('0x123...');
@@ -95,14 +102,19 @@ const borrowResult = await sdk.borrow(
   pairAddress,
   borrowAmount,
   collateralAmount,
-  userAddress,
-  {
-    oracleAddress: ORACLE_ADDRESS,
-    autoApprove: true,
-    gasLimit: 2000000 // Optional custom gas limit
-  }
+  userAddress
 );
 console.log(`Borrow transaction hash: ${borrowResult.transactionHash}`);
+
+// Withdraw supplied assets
+const withdrawShares = ethers.utils.parseEther('2.5');
+const withdrawResult = await sdk.withdraw(pairAddress, withdrawShares, userAddress);
+console.log(`Withdraw transaction hash: ${withdrawResult.transactionHash}`);
+
+// Repay borrowed assets
+const repayShares = ethers.utils.parseEther('1');
+const repayResult = await sdk.repay(pairAddress, repayShares, userAddress, true);
+console.log(`Repay transaction hash: ${repayResult.transactionHash}`);
 ```
 
 ### Managing Collateral
@@ -121,98 +133,30 @@ console.log(`Remove collateral transaction hash: ${removeResult.transactionHash}
 console.log(`Removed amount: ${removeResult.amount} ${removeResult.symbol}`);
 ```
 
-### Repayment and Withdrawal
-
-```typescript
-// Repay borrowed assets
-const sharesToRepay = ethers.utils.parseEther('2.5');
-const repayResult = await sdk.repay(pairAddress, sharesToRepay, userAddress, true);
-console.log(`Repay transaction hash: ${repayResult.transactionHash}`);
-console.log(`Repaid amount: ${repayResult.amount} ${repayResult.symbol}`);
-
-// Withdraw supplied assets
-const sharesToWithdraw = ethers.utils.parseEther('1.75');
-const withdrawResult = await sdk.withdraw(pairAddress, sharesToWithdraw, userAddress);
-console.log(`Withdraw transaction hash: ${withdrawResult.transactionHash}`);
-console.log(`Withdrawn amount: ${withdrawResult.amount} ${withdrawResult.symbol}`);
-```
-
 ### Reading User Positions
 
 ```typescript
 // Get user's position details
 const position = await sdk.readUserPosition(pairAddress, userAddress);
 
-// Format and display position data
 console.log('User position:', {
-  collateralBalance: ethers.utils.formatEther(position.userCollateralBalance),
-  borrowShares: ethers.utils.formatEther(position.userBorrowShares),
-  liquidationPrice: ethers.utils.formatEther(position.liquidationPrice)
+  collateralBalance: position.formattedCollateralBalance,
+  borrowShares: position.formattedBorrowShares,
+  liquidationPrice: position.formattedLiquidationPrice,
+  collateralToken: position.collateralSymbol,
+  assetToken: position.assetSymbol
 });
 
 // Calculate position health metrics
 if (!position.userCollateralBalance.isZero() && !position.userBorrowShares.isZero()) {
+  const pairData = await sdk.readPairData(pairAddress);
   const utilizationRatio = position.userBorrowShares
-    .mul(position.liquidationPrice)
-    .mul(100)
+    .mul(pairData.maxLTV)
     .div(position.userCollateralBalance);
-    
+
   console.log(`Collateral utilization: ${ethers.utils.formatUnits(utilizationRatio, 0)}%`);
   console.log(`Buffer remaining: ${100 - Number(ethers.utils.formatUnits(utilizationRatio, 0))}%`);
 }
-```
-
-## Complete Transaction Flow Example
-
-```typescript
-// Setup SDK
-const provider = new ethers.providers.JsonRpcProvider(RPC_URL);
-const wallet = new ethers.Wallet(PRIVATE_KEY, provider);
-const sdk = new HyperlendSDK(wallet, REGISTRY_ADDRESS);
-
-// Step 1: Supply assets
-const supplyAmount = ethers.utils.parseEther('10');
-const supplyResult = await sdk.supply(pairAddress, supplyAmount, wallet.address, true);
-console.log(`Supplied ${supplyResult.amount} ${supplyResult.symbol}`);
-
-// Step 2: Add collateral
-const collateralAmount = ethers.utils.parseEther('5');
-const addCollateralResult = await sdk.addCollateral(pairAddress, collateralAmount, wallet.address, true);
-console.log(`Added ${addCollateralResult.amount} ${addCollateralResult.symbol} as collateral`);
-
-// Step 3: Borrow against collateral
-const borrowAmount = ethers.utils.parseEther('2');
-const borrowResult = await sdk.borrow(
-  pairAddress,
-  borrowAmount,
-  ethers.constants.Zero, // No additional collateral in this step
-  wallet.address,
-  { 
-    oracleAddress: ORACLE_ADDRESS,
-    autoApprove: true
-  }
-);
-console.log(`Borrowed ${borrowResult.amount} ${borrowResult.symbol}`);
-
-// Step 4: Check position after borrowing
-const position = await sdk.readUserPosition(pairAddress, wallet.address);
-console.log(`Position collateral: ${ethers.utils.formatEther(position.userCollateralBalance)}`);
-console.log(`Position borrow shares: ${ethers.utils.formatEther(position.userBorrowShares)}`);
-
-// Step 5: Repay half of the borrowed amount
-const repayShares = position.userBorrowShares.div(2);
-const repayResult = await sdk.repay(pairAddress, repayShares, wallet.address, true);
-console.log(`Repaid ${repayResult.amount} ${repayResult.symbol}`);
-
-// Step 6: Remove some collateral
-const removeAmount = position.userCollateralBalance.div(4);
-const removeResult = await sdk.removeCollateral(pairAddress, removeAmount, wallet.address);
-console.log(`Removed ${removeResult.amount} ${removeResult.symbol} collateral`);
-
-// Step 7: Withdraw supplied assets
-const withdrawShares = supplyAmount.div(2);
-const withdrawResult = await sdk.withdraw(pairAddress, withdrawShares, wallet.address);
-console.log(`Withdrawn ${withdrawResult.amount} ${withdrawResult.symbol}`);
 ```
 
 ## API Reference
@@ -223,8 +167,8 @@ console.log(`Withdrawn ${withdrawResult.amount} ${withdrawResult.symbol}`);
 |--------|-------------|------------|---------|
 | `getDeployedPairsLength()` | Get number of deployed pairs | None | `Promise<ethers.BigNumber>` |
 | `getAllPairAddresses()` | Get all deployed pair addresses | None | `Promise<string[]>` |
-| `addPair(pairAddress, signer, overrides?)` | Add a new pair to registry | `pairAddress: string, signer: ethers.Signer, overrides?: ethers.Overrides` | `Promise<void>` |
-| `setDeployers(deployers, allow, signer, overrides?)` | Set deployer permissions | `deployers: string[], allow: boolean, signer: ethers.Signer, overrides?: ethers.Overrides` | `Promise<void>` |
+| `addPair(pairAddress, signer, overrides?)` | Add a new pair to registry | `pairAddress: string, signer: ethers.Signer, overrides?: ethers.Overrides` | `Promise<{transactionHash: string}>` |
+| `setDeployers(deployers, allow, signer, overrides?)` | Set deployer permissions | `deployers: string[], allow: boolean, signer: ethers.Signer, overrides?: ethers.Overrides` | `Promise<{transactionHash: string}>` |
 | `isDeployer(deployer)` | Check if address is a deployer | `deployer: string` | `Promise<boolean>` |
 | `getPairAddressByName(name)` | Get pair address by name | `name: string` | `Promise<string>` |
 
@@ -233,8 +177,8 @@ console.log(`Withdrawn ${withdrawResult.amount} ${withdrawResult.symbol}`);
 | Method | Description | Parameters | Returns |
 |--------|-------------|------------|---------|
 | `readPairData(pairAddress)` | Get comprehensive pair data | `pairAddress: string` | `Promise<PairData>` |
-| `getTotalAsset(pairAddress)` | Get total asset amount | `pairAddress: string` | `Promise<ethers.BigNumber>` |
-| `getTotalBorrow(pairAddress)` | Get total borrow amount | `pairAddress: string` | `Promise<ethers.BigNumber>` |
+| `getTotalAsset(pairAddress)` | Get total asset amount | `pairAddress: string` | `Promise<{totalAssets: ethers.BigNumber, formatted: string, symbol: string}>` |
+| `getTotalBorrow(pairAddress)` | Get total borrow amount | `pairAddress: string` | `Promise<{totalBorrow: ethers.BigNumber, formatted: string, symbol: string}>` |
 
 ### User Position Functions
 
@@ -242,7 +186,7 @@ console.log(`Withdrawn ${withdrawResult.amount} ${withdrawResult.symbol}`);
 |--------|-------------|------------|---------|
 | `readUserPosition(pairAddress, userAddress)` | Get user position details | `pairAddress: string, userAddress: string` | `Promise<UserPosition>` |
 | `supply(pairAddress, amount, userAddress, autoApprove?)` | Supply assets to a pair | `pairAddress: string, amount: ethers.BigNumber, userAddress: string, autoApprove?: boolean` | `Promise<TransactionResult>` |
-| `borrow(pairAddress, amount, collateralAmount, userAddress, options?)` | Borrow assets with collateral | `pairAddress: string, amount: ethers.BigNumber, collateralAmount: ethers.BigNumber, userAddress: string, options?: {gasLimit?: number, oracleAddress?: string, autoApprove?: boolean}` | `Promise<TransactionResult>` |
+| `borrow(pairAddress, amount, collateralAmount, userAddress, options?)` | Borrow assets with collateral | `pairAddress: string, amount: ethers.BigNumber, collateralAmount: ethers.BigNumber, userAddress: string, options?: {gasLimit?: number, autoApprove?: boolean}` | `Promise<TransactionResult>` |
 | `withdraw(pairAddress, shares, userAddress)` | Withdraw supplied assets | `pairAddress: string, shares: ethers.BigNumber, userAddress: string` | `Promise<TransactionResult>` |
 | `repay(pairAddress, shares, userAddress, autoApprove?)` | Repay borrowed assets | `pairAddress: string, shares: ethers.BigNumber, userAddress: string, autoApprove?: boolean` | `Promise<TransactionResult>` |
 | `addCollateral(pairAddress, amount, userAddress, autoApprove?)` | Add collateral to position | `pairAddress: string, amount: ethers.BigNumber, userAddress: string, autoApprove?: boolean` | `Promise<TransactionResult>` |
@@ -256,7 +200,7 @@ console.log(`Withdrawn ${withdrawResult.amount} ${withdrawResult.symbol}`);
 interface PairData {
   asset: string;                          // Asset token address
   collateral: string;                     // Collateral token address
-  maxLTV: ethers.BigNumber;               // Maximum loan-to-value ratio (in basis points)
+  maxLTV: ethers.BigNumber;               // Maximum loan-to-value ratio
   cleanLiquidationFee: ethers.BigNumber;  // Fee for clean liquidations
   dirtyLiquidationFee: ethers.BigNumber;  // Fee for dirty liquidations
   protocolLiquidationFee: ethers.BigNumber; // Protocol fee on liquidations
@@ -264,9 +208,17 @@ interface PairData {
   totalBorrowAmount: ethers.BigNumber;    // Total borrowed from the pair
   totalCollateral: ethers.BigNumber;      // Total collateral in the pair
   currentRateInfo: {                      // Interest rate information
-    lastBlock: ethers.BigNumber;
-    borrowRate: ethers.BigNumber;
+    lastBlock: number;
+    feeToProtocolRate: number;
+    lastTimestamp: ethers.BigNumber;
+    ratePerSec: ethers.BigNumber;
+    fullUtilizationRate: ethers.BigNumber;
   };
+  formattedTotalAssetAmount: string;      // Formatted total assets
+  formattedTotalBorrowAmount: string;     // Formatted total borrowed amount
+  formattedTotalCollateral: string;       // Formatted total collateral
+  assetSymbol: string;                    // Asset token symbol
+  collateralSymbol: string;               // Collateral token symbol
 }
 ```
 
@@ -277,6 +229,11 @@ interface UserPosition {
   userCollateralBalance: ethers.BigNumber; // User's collateral balance
   userBorrowShares: ethers.BigNumber;      // User's borrow shares
   liquidationPrice: ethers.BigNumber;      // Liquidation price threshold
+  formattedCollateralBalance: string;      // Formatted collateral balance
+  formattedBorrowShares: string;           // Formatted borrow shares
+  formattedLiquidationPrice: string;       // Formatted liquidation price
+  collateralSymbol: string;                // Collateral token symbol
+  assetSymbol: string;                     // Asset token symbol
 }
 ```
 
@@ -284,13 +241,13 @@ interface UserPosition {
 
 ```typescript
 interface TransactionResult {
-  success: boolean;              // Whether the transaction was successful
+  success: boolean;              // Whether transaction was successful
   transactionHash: string;       // Transaction hash
-  blockNumber: number;           // Block number where the transaction was confirmed
+  blockNumber: number;           // Block number of confirmation
   amount: string;                // Formatted amount with proper decimals
   symbol: string;                // Token symbol
-  collateral?: string;           // Formatted collateral amount (for borrow operations)
-  collateralSymbol?: string;     // Collateral token symbol (for borrow operations)
+  collateral?: string;           // Formatted collateral amount (for borrow)
+  collateralSymbol?: string;     // Collateral token symbol (for borrow)
 }
 ```
 
@@ -298,39 +255,24 @@ interface TransactionResult {
 
 The SDK provides detailed error messages for various failure scenarios:
 
-- **Token Approval Errors**: If tokens cannot be approved and `autoApprove` is false
-- **Insufficient Balance Errors**: If the user has insufficient tokens for the operation
-- **Transaction Errors**: Detailed error messages from failed transactions
-- **Contract Errors**: Smart contract reverts with reason strings
-- **Oracle Errors**: When price data is unavailable or considered invalid
-
-Example of handling errors:
-
 ```typescript
 try {
   const result = await sdk.borrow(pairAddress, amount, collateral, userAddress);
   console.log("Success:", result);
 } catch (error) {
-  if (error.message.includes("price")) {
-    console.error("Oracle price error:", error.message);
-  } else if (error.message.includes("allowance")) {
-    console.error("Token approval error:", error.message);
+  if (error.message.includes("allowance")) {
+    console.error("Token approval required");
   } else if (error.message.includes("balance")) {
-    console.error("Insufficient balance:", error.message);
+    console.error("Insufficient balance");
+  } else if (error.message.includes("oracle")) {
+    console.error("Oracle issue - price data unavailable");
   } else {
-    console.error("Unknown error:", error.message);
+    console.error("Error:", error.message);
   }
 }
 ```
 
 ## Development
-
-### Prerequisites
-
-- Node.js 14.x or higher
-- npm or yarn
-- TypeScript 4.x or higher
-- An Ethereum-compatible wallet with HyperLiquid testnet tokens
 
 ### Environment Setup
 
@@ -345,7 +287,7 @@ TEST_USER_ADDRESS=0x18778f39Bb22A12d329faEab0969ef3A9a99E3ee
 ORACLE_ADDRESS=0xFc7A87D9413F689d1722Bac165BC0D3Af88a3cd9
 ```
 
-### Building the SDK
+### Building and Testing
 
 ```bash
 # Install dependencies
@@ -353,57 +295,20 @@ npm install
 
 # Build the SDK
 npm run build
-```
 
-### Testing
-
-The SDK can be tested using the provided test script:
-
-```bash
 # Run the test script
 npm run test
-
-# Or directly using ts-node
-ts-node src/test-sdk.ts
 ```
-
-This will run through basic registry functions, read functions, user position queries, and transaction flow tests.
-
-### Production Usage Notes
-
-1. **Gas Optimization**: The SDK automatically estimates gas with a buffer, but for production, consider monitoring gas costs and adjusting buffer parameters.
-
-2. **Oracle Integration**: Always validate that oracles are functioning correctly before executing borrow transactions.
-
-3. **Error Handling**: Implement comprehensive error handling in production applications to handle different failure modes.
-
-4. **Security**: Never hardcode private keys; use secure environment variables or key management solutions.
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **Transaction Reverted**: If transactions are consistently reverting, check:
-    - Oracle price availability
-    - Token approvals
-    - User balance
-    - Gas limit settings
-
-2. **Oracle Issues**: If borrowing fails with oracle errors:
-    - Verify the oracle address is correct
-    - Check if the oracle has valid price data
-    - Consider implementing fallback oracles
-
-3. **Gas Estimation Failures**: If gas estimation fails:
-    - Use the manual gas limit option in the borrow function
-    - Set a reasonable fixed gas limit based on observed successful transactions
-
-### Support
-
-For questions and support, please:
-- Open an issue on the GitHub repository
-- Check the HyperLend documentation at [docs.hyperlend.finance](https://docs.hyperlend.finance)
-- Join the HyperLiquid Discord community
+1. **Transaction Reverted**: Check oracle price availability, token approvals, and user balance
+2. **Gas Estimation Failures**: Use the manual gas limit option in the borrow function
+3. **Oracle Issues**: Verify the oracle address is correct and has valid price data
+4. **Insufficient Collateral**: Ensure user has enough collateral to borrow the requested amount
+5. **Allowance Errors**: Set `autoApprove` to true or manually approve tokens before transactions
 
 ## License
 
