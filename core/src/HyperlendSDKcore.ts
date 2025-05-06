@@ -83,15 +83,15 @@ export class HyperlendSDKcore {
 
         // If current allowance is less than the amount, approve
         if (currentAllowance.lt(amount)) {
-            console.log(`Approving ${amount.toString()} tokens for ${tokenAddress}`);
+            // console.log(`Approving ${amount.toString()} tokens for ${tokenAddress}`);
             // Use MAX_UINT256 for infinite approval, or use the exact amount needed
-            const tx = await erc20Contract.approve(this.poolAddress, utils.parseEther("1000000000"));
+            const tx = await erc20Contract.approve(this.poolAddress, amount);
             await tx.wait(1);
-            console.log("Approval transaction confirmed");
+            // console.log("Approval transaction confirmed");
             return tx;
         }
 
-        console.log('Token already approved');
+        // console.log('Token already approved');
         return { hash: '0x0', wait: async () => { return { status: 1 }; } } as providers.TransactionResponse;
     }
 
@@ -343,15 +343,12 @@ export class HyperlendSDKcore {
         // Check borrowing capacity first
         const userData = await this.getUserAccountData(userAddress);
 
-        console.log(`Available borrows: ${utils.formatUnits(userData.availableBorrowsBase, 18)} HYPE`);
-        console.log(`Attempting to borrow: ${utils.formatUnits(amount, 18)}`);
-
         // Simple check without price conversion
         // We'll assume the amount is already in the correct denomination
         if (amount.gt(userData.availableBorrowsBase)) {
             throw new Error(
-                `Insufficient borrowing capacity. Available: ${utils.formatUnits(userData.availableBorrowsBase, 18)} HYPE, ` +
-                `Requested: ${utils.formatUnits(amount, 18)}`
+                `Insufficient borrowing capacity. Available: ${userData.availableBorrowsBase}, ` +
+                `Requested: ${amount})}`
             );
         }
 
