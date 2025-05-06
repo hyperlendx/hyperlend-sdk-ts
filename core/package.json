@@ -1,7 +1,7 @@
 {
   "name": "hyperlend-sdk-core",
   "version": "0.1.0",
-  "description": "Core SDK for interacting with Hyperlend protocol",
+  "description": "SDK for interacting with HyperLend Core markets",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
