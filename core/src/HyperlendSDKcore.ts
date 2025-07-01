@@ -149,7 +149,11 @@ export class HyperlendSDKcore {
         }
 
         // console.log('Token already approved');
-        return { hash: '0x0', wait: async () => { return { status: 1 }; } } as providers.TransactionResponse;
+        return {
+            hash: '0x0', wait: async () => {
+                return {status: 1};
+            }
+        } as providers.TransactionResponse;
     }
 
     /**
@@ -282,11 +286,25 @@ export class HyperlendSDKcore {
 
         // Get configuration and token addresses
         const [
-            { decimals, ltv, liquidationThreshold, liquidationBonus, reserveFactor, usageAsCollateralEnabled,
-                borrowingEnabled, stableBorrowRateEnabled, isActive, isFrozen },
-            { aTokenAddress, stableDebtTokenAddress, variableDebtTokenAddress },
-            { unbacked, accruedToTreasuryScaled, totalAToken, totalStableDebt, totalVariableDebt, liquidityRate,
-                variableBorrowRate, stableBorrowRate, averageStableBorrowRate, liquidityIndex, variableBorrowIndex, lastUpdateTimestamp }
+            {
+                decimals, ltv, liquidationThreshold, liquidationBonus, reserveFactor, usageAsCollateralEnabled,
+                borrowingEnabled, stableBorrowRateEnabled, isActive, isFrozen
+            },
+            {aTokenAddress, stableDebtTokenAddress, variableDebtTokenAddress},
+            {
+                unbacked,
+                accruedToTreasuryScaled,
+                totalAToken,
+                totalStableDebt,
+                totalVariableDebt,
+                liquidityRate,
+                variableBorrowRate,
+                stableBorrowRate,
+                averageStableBorrowRate,
+                liquidityIndex,
+                variableBorrowIndex,
+                lastUpdateTimestamp
+            }
         ] = await Promise.all([
             dataProviderContract.getReserveConfigurationData(assetAddress),
             dataProviderContract.getReserveTokensAddresses(assetAddress),
@@ -340,7 +358,7 @@ export class HyperlendSDKcore {
         amount: BigNumber,
         onBehalfOf?: string,
         referralCode: number = 0
-    ): Promise<{transactionHash: string}> {
+    ): Promise<{ transactionHash: string }> {
         if (!this.isSigner(this.providerOrSigner)) {
             throw new Error("Signer is required for supply operation");
         }
@@ -364,7 +382,7 @@ export class HyperlendSDKcore {
                 referralCode
             );
             await tx.wait(1);
-            return { transactionHash: tx.hash };
+            return {transactionHash: tx.hash};
         } catch (error) {
             // If the transaction still fails, try with a manual gas limit
             console.log("Supply failed, retrying with manual gas limit...");
@@ -373,10 +391,10 @@ export class HyperlendSDKcore {
                 amount,
                 userAddress,
                 referralCode,
-                { gasLimit: 500000 }
+                {gasLimit: 500000}
             );
             await tx.wait(1);
-            return { transactionHash: tx.hash };
+            return {transactionHash: tx.hash};
         }
     }
 
@@ -389,7 +407,7 @@ export class HyperlendSDKcore {
         interestRateMode: InterestRateMode,
         referralCode: number = 0,
         onBehalfOf?: string
-    ): Promise<{transactionHash: string}> {
+    ): Promise<{ transactionHash: string }> {
         if (!this.isSigner(this.providerOrSigner)) {
             throw new Error("Signer is required for borrow operation");
         }
@@ -423,7 +441,7 @@ export class HyperlendSDKcore {
                 userAddress
             );
             await tx.wait(1);
-            return { transactionHash: tx.hash };
+            return {transactionHash: tx.hash};
         } catch (error) {
             console.log("Borrow failed, retrying with manual gas limit...");
             const tx = await poolContract.borrow(
@@ -432,10 +450,10 @@ export class HyperlendSDKcore {
                 interestRateMode,
                 referralCode,
                 userAddress,
-                { gasLimit: 500000 }
+                {gasLimit: 500000}
             );
             await tx.wait(1);
-            return { transactionHash: tx.hash };
+            return {transactionHash: tx.hash};
         }
     }
 
@@ -447,7 +465,7 @@ export class HyperlendSDKcore {
         amount: BigNumber,
         interestRateMode: InterestRateMode,
         onBehalfOf?: string
-    ): Promise<{transactionHash: string}> {
+    ): Promise<{ transactionHash: string }> {
         if (!this.isSigner(this.providerOrSigner)) {
             throw new Error("Signer is required for repay operation");
         }
@@ -471,7 +489,7 @@ export class HyperlendSDKcore {
                 userAddress
             );
             await tx.wait(1);
-            return { transactionHash: tx.hash };
+            return {transactionHash: tx.hash};
         } catch (error) {
             console.log("Repay failed, retrying with manual gas limit...");
             const tx = await poolContract.repay(
@@ -479,10 +497,10 @@ export class HyperlendSDKcore {
                 amount,
                 interestRateMode,
                 userAddress,
-                { gasLimit: 500000 }
+                {gasLimit: 500000}
             );
             await tx.wait(1);
-            return { transactionHash: tx.hash };
+            return {transactionHash: tx.hash};
         }
     }
 
@@ -493,7 +511,7 @@ export class HyperlendSDKcore {
         asset: string,
         amount: BigNumber,
         to?: string
-    ): Promise<{transactionHash: string}> {
+    ): Promise<{ transactionHash: string }> {
         if (!this.isSigner(this.providerOrSigner)) {
             throw new Error("Signer is required for withdraw operation");
         }
@@ -513,17 +531,17 @@ export class HyperlendSDKcore {
                 recipient
             );
             await tx.wait(1);
-            return { transactionHash: tx.hash };
+            return {transactionHash: tx.hash};
         } catch (error) {
             console.log("Withdraw failed, retrying with manual gas limit...");
             const tx = await poolContract.withdraw(
                 asset,
                 amount,
                 recipient,
-                { gasLimit: 500000 }
+                {gasLimit: 500000}
             );
             await tx.wait(1);
-            return { transactionHash: tx.hash };
+            return {transactionHash: tx.hash};
         }
     }
 
@@ -533,7 +551,7 @@ export class HyperlendSDKcore {
     public async setUserUseReserveAsCollateral(
         asset: string,
         useAsCollateral: boolean
-    ): Promise<{transactionHash: string}> {
+    ): Promise<{ transactionHash: string }> {
         if (!this.isSigner(this.providerOrSigner)) {
             throw new Error("Signer is required for setUserUseReserveAsCollateral operation");
         }
@@ -551,23 +569,23 @@ export class HyperlendSDKcore {
                 useAsCollateral
             );
             await tx.wait(1);
-            return { transactionHash: tx.hash };
+            return {transactionHash: tx.hash};
         } catch (error) {
             console.log("SetUserUseReserveAsCollateral failed, retrying with manual gas limit...");
             const tx = await poolContract.setUserUseReserveAsCollateral(
                 asset,
                 useAsCollateral,
-                { gasLimit: 500000 }
+                {gasLimit: 500000}
             );
             await tx.wait(1);
-            return { transactionHash: tx.hash };
+            return {transactionHash: tx.hash};
         }
     }
 
     /**
      * Set the user's E-Mode category
      */
-    public async setUserEMode(categoryId: number): Promise<{transactionHash: string}> {
+    public async setUserEMode(categoryId: number): Promise<{ transactionHash: string }> {
         if (!this.isSigner(this.providerOrSigner)) {
             throw new Error("Signer is required for setUserEMode operation");
         }
@@ -582,15 +600,15 @@ export class HyperlendSDKcore {
         try {
             const tx = await poolContract.setUserEMode(categoryId);
             await tx.wait(1);
-            return { transactionHash: tx.hash };
+            return {transactionHash: tx.hash};
         } catch (error) {
             console.log("SetUserEMode failed, retrying with manual gas limit...");
             const tx = await poolContract.setUserEMode(
                 categoryId,
-                { gasLimit: 500000 }
+                {gasLimit: 500000}
             );
             await tx.wait(1);
-            return { transactionHash: tx.hash };
+            return {transactionHash: tx.hash};
         }
     }
 
@@ -609,9 +627,9 @@ export class HyperlendSDKcore {
         return eMode.toNumber();
     }
 
-    // ============================================
-    // UPDATED BRIDGING FUNCTIONS
-    // ============================================
+// ============================================
+// BRIDGING FUNCTIONS
+// ============================================
 
     /**
      * Get the domain and types for the SpotSend signature
@@ -628,15 +646,15 @@ export class HyperlendSDKcore {
 
         const types = {
             'HyperliquidTransaction:SpotSend': [
-                { name: 'hyperliquidChain', type: 'string' },
-                { name: 'destination', type: 'string' },
-                { name: 'token', type: 'string' },
-                { name: 'amount', type: 'string' },
-                { name: 'time', type: 'uint64' },
+                {name: 'hyperliquidChain', type: 'string'},
+                {name: 'destination', type: 'string'},
+                {name: 'token', type: 'string'},
+                {name: 'amount', type: 'string'},
+                {name: 'time', type: 'uint64'},
             ],
         };
 
-        return { domain, types };
+        return {domain, types};
     }
 
     /**
@@ -678,7 +696,6 @@ export class HyperlendSDKcore {
      * @param amount The amount to send
      * @returns Transaction hash
      */
-    // In HyperlendSDKcore.ts, update the bridgeToCore method:
     public async bridgeToCore(
         tokenAddress: string,
         amount: number,
@@ -707,7 +724,7 @@ export class HyperlendSDKcore {
 
                 await tx.wait(1);
                 console.log('Native token transfer to system contract complete');
-                return { txHash: tx.hash };
+                return {txHash: tx.hash};
             }
 
             // Create contract instance for non-native tokens
@@ -718,7 +735,7 @@ export class HyperlendSDKcore {
             console.log(`Transferring ${amount} tokens (${amountInWei.toString()} wei) to system contract ${systemContract}`);
             const tx = await token.transfer(systemContract, amountInWei);
             await tx.wait(1);
-            return { txHash: tx.hash };
+            return {txHash: tx.hash};
         } catch (error) {
             console.error('Error sending token to Core:', error);
             throw error;
@@ -726,65 +743,102 @@ export class HyperlendSDKcore {
     }
 
     /**
-     * Bridge a token from HyperCore to EVM using the spotSend action
-     * @param tokenId The token ID
-     * @param amount The amount to bridge
-     * @returns Promise with the transaction result
+     * Bridges tokens from HyperLiquid to an EVM chain
+     * @param tokenSymbol The token symbol (e.g., "HYPE")
+     * @param tokenId The token identifier on HyperLiquid
+     * @param amount The amount to transfer
+     * @param coreSystemAddress The destination address on target chain
+     * @param chainId The target EVM chain ID
+     * @param weiDecimals Token decimal precision
+     * @param signature Cryptographic signature authorizing the transfer
+     * @param timestamp Transaction timestamp (used as nonce)
+     * @param hyperliquidChain HyperLiquid chain to use (defaults to "Testnet")
+     * @returns Transaction result
      */
-    public async bridgeToEvm(
-        tokenId: string,
-        amount: number,
+    public async bridgeToEVM(
+        tokenSymbol: string,
+        tokenId: string | number,
+        amount: string,
+        coreSystemAddress: string,
+        chainId: number,
+        weiDecimals: number,
+        signature: string,
+        timestamp: number,
+        hyperliquidChain: string = 'MAINNET',
     ): Promise<any> {
+        const baseUrl = this.hyperLiquidAPI[this.currentChainApiName];
+        if (!baseUrl) {
+            throw new Error(`API URL not configured for chain: ${this.currentChainApiName}`);
+        }
+
+        // Format amount with proper decimal precision
+        const formattedAmount = Number(
+            parseFloat(amount).toFixed(weiDecimals)
+        ).toString();
+
+        // Format token correctly
+        const formattedToken = `${tokenSymbol}:${tokenId}`;
+
+        // Parse the signature
+        let r: string, s: string, yParity: number;
+
         try {
-            const baseUrl = this.hyperLiquidAPI[this.currentChainApiName];
-            if (!baseUrl) {
-                throw new Error(`API URL not configured for chain: ${this.currentChainApiName}`);
+            // Try using ethers splitSignature first
+            const splitSig = utils.splitSignature(signature as `0x${string}`);
+            r = splitSig.r;
+            s = splitSig.s;
+            yParity = splitSig.v === 27 ? 0 : 1;
+        } catch (error) {
+            // Fallback: manual parsing if splitSignature fails
+            const sig = signature.startsWith('0x') ? signature.slice(2) : signature;
+            if (sig.length !== 130) {
+                throw new Error('Invalid signature length');
             }
 
-            // Get system contract address for the token
-            const systemContract = await this.getSystemContractAddressFromTokenId(tokenId);
+            r = '0x' + sig.slice(0, 64);
+            s = '0x' + sig.slice(64, 128);
+            const v = parseInt(sig.slice(128, 130), 16);
+            yParity = v === 27 ? 0 : 1;
+        }
 
-            // Get current timestamp
-            const timestamp = Date.now();
+        // Create the action object with the correct structure
+        const action = {
+            type: 'spotSend',
+            amount: formattedAmount,
+            destination: coreSystemAddress,
+            hyperliquidChain: hyperliquidChain,
+            signatureChainId: `0x${chainId.toString(16)}`,
+            time: timestamp,
+            token: formattedToken,
+        };
 
-            // Create the action object for HyperCore to EVM transfer
-            const action = {
-                type: 'spotSend',
-                hyperliquidChain: this.currentChainApiName === 'testnet' ? 'Testnet' : 'Mainnet',
-                destination: systemContract,
-                token: tokenId,
-                amount: amount.toString(),
-                time: timestamp,
-            };
+        // Create the payload
+        const payload = {
+            action: action,
+            nonce: timestamp,
+            signature: {
+                r: r,
+                s: s,
+                v: yParity
+            }
+        };
 
-            // Create the payload
-            const payload = {
-                action,
-                nonce: timestamp,
-                signature: {
-                    r: '0x0000000000000000000000000000000000000000000000000000000000000000',
-                    s: '0x0000000000000000000000000000000000000000000000000000000000000000',
-                    v: 0,
-                },
-            };
+        console.log('Sending bridge request:', JSON.stringify(payload, null, 2));
 
-            console.log('Sending bridge request to HyperLiquid API:', payload);
-
-            // Send the request to the HyperLiquid API
+        try {
             const response = await fetch(`${baseUrl}/exchange`, {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
+                    'Content-Type': 'application/json'
                 },
-                body: JSON.stringify(payload),
+                body: JSON.stringify(payload)
             });
 
-            // Handle non-OK responses
             if (!response.ok) {
-                let errorMessage;
+                let errorMessage: string;
                 try {
                     const errorData = await response.json();
-                    errorMessage = errorData.message || response.statusText;
+                    errorMessage = errorData.message || errorData.response || response.statusText;
                 } catch (e) {
                     try {
                         errorMessage = await response.text();
@@ -792,7 +846,7 @@ export class HyperlendSDKcore {
                         errorMessage = response.statusText;
                     }
                 }
-                throw new Error(`Bridge to EVM failed: ${errorMessage}`);
+                throw new Error(`Bridge to EVM failed (${response.status}): ${errorMessage}`);
             }
 
             // Parse the successful response
@@ -800,21 +854,25 @@ export class HyperlendSDKcore {
             try {
                 result = await response.json();
             } catch (e) {
-                console.error('Error parsing JSON response:', e);
-                return { status: 'ok', response: { txHash: `tx-${timestamp}` } };
+                console.warn("Warning: Could not parse JSON response", e);
+                // Return a basic success response if we can't parse the JSON
+                return {
+                    status: 'ok',
+                    response: { txHash: `tx-${timestamp}` },
+                    rawResponse: await response.text().catch(() => "Raw response unavailable")
+                };
             }
 
             // Check for error status in the response
             if (result.status === 'err') {
-                throw new Error(
-                    `Transaction failed: ${result.response || 'Unknown error'}`,
-                );
+                throw new Error(`Bridge to EVM failed: ${JSON.stringify(result.response || result)}`);
             }
 
-            console.log('Bridge to EVM successful:', result);
+            console.log('Bridge transaction successful:', result);
             return result;
+
         } catch (error) {
-            console.error('Error bridging to EVM:', error);
+            console.error('Bridge to EVM error:', error);
             throw error;
         }
     }
@@ -869,12 +927,7 @@ export class HyperlendSDKcore {
                 throw new Error(`Token index not found for EVM address: ${tokenAddress}`);
             }
 
-            // Encode system contract address: 0x20 + zeros + hex encoded token index
-            const hexIndex = tokenIndex.toString(16);
-            const paddedHex = hexIndex.padStart(2, '0');
-            const systemContract = `0x20${'0'.repeat(38 - paddedHex.length)}${paddedHex}`;
-
-            return systemContract;
+            return this.getSystemContractAddressFromTokenIndex(tokenIndex);
         } catch (error) {
             console.error('Error getting system contract address:', error);
             throw error;
@@ -887,8 +940,11 @@ export class HyperlendSDKcore {
      * @returns System contract address
      */
     private async getSystemContractAddressFromTokenId(tokenId: string): Promise<string> {
-        // Special case for HYPE
-        if (tokenId.toLowerCase() === 'hype' || tokenId.toLowerCase() === 'hype:0') {
+        // Special case for HYPE - handle all HYPE token identifiers
+        if (tokenId.toLowerCase() === 'hype' ||
+            tokenId.toLowerCase() === 'hype:0' ||
+            tokenId.toLowerCase() === 'hype:150' ||
+            tokenId.toLowerCase() === '0x0d01dc56dcaaca66ad901c959b4011ec') {
             return '0x2222222222222222222222222222222222222222';
         }
 
@@ -919,7 +975,9 @@ export class HyperlendSDKcore {
             let tokenIndex: number | null = null;
 
             for (const token of data.tokens) {
-                if (token.tokenId === tokenId) {
+                // Match by token ID or token index if that matches the HYPE token ID
+                if (token.tokenId === tokenId ||
+                    (token.tokenId === '0x0d01dc56dcaaca66ad901c959b4011ec' && tokenId === 'HYPE')) {
                     tokenIndex = token.index;
                     break;
                 }
@@ -955,8 +1013,8 @@ export class HyperlendSDKcore {
      * @returns System contract address
      */
     private getSystemContractAddressFromTokenIndex(tokenIndex: number): string {
-        // Special case for native HYPE (usually index 0 or specific case)
-        if (tokenIndex === 0) {
+        // Special case for HYPE with index 0 or 150
+        if (tokenIndex === 0 || tokenIndex === 150) {
             return '0x2222222222222222222222222222222222222222';
         }
 
@@ -989,6 +1047,10 @@ export class HyperlendSDKcore {
      * @returns Bridge configuration for the token
      */
     public getBridgeConfig(tokenSymbol: string): BridgeTokenConfig | null {
+        // Case-insensitive matching for HYPE token
+        if (tokenSymbol.toLowerCase() === 'hype') {
+            return this.bridgeableTokens['HYPE'] || null;
+        }
         return this.bridgeableTokens[tokenSymbol] || null;
     }
 

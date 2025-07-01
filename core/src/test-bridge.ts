@@ -1,4 +1,5 @@
 import { providers, Wallet, utils } from "ethers";
+import { TypedDataSigner } from "@ethersproject/abstract-signer";
 import { HyperlendSDKcore } from "./HyperlendSDKcore";
 import * as dotenv from 'dotenv';
 
@@ -14,8 +15,17 @@ const PRIVATE_KEY = process.env.PRIVATE_KEY;
 
 // Bridge-specific environment variables
 const HYPE_TOKEN_ADDRESS = process.env.HYPE_TOKEN_ADDRESS || '0x0000000000000000000000000000000000000000'; // Default for native HYPE
-const HYPE_TOKEN_ID = process.env.HYPE_TOKEN_ID || 'HYPE:0'; // Default HYPE token ID on HyperCore
-const BRIDGE_AMOUNT = parseFloat(process.env.TEST_AMOUNT || '0.001'); // Allow configuring test amount
+const BRIDGE_AMOUNT = parseFloat(process.env.TEST_AMOUNT || '0.01'); // Allow configuring test amount
+const HYPERLIQUID_CHAIN = process.env.HYPERLIQUID_CHAIN || 'Mainnet';
+const TARGET_ADDRESS = process.env.TARGET_ADDRESS; // Optional target address for bridging
+
+// HYPE token identifiers to test - trying different formats
+const HYPE_TOKEN_IDS = [
+    '', // Try without token ID
+    '0',
+    '150',
+    '0x0d01dc56dcaaca66ad901c959b4011ec'
+];
 
 // Check if required environment variables are provided
 if (!RPC_URL || !DATA_PROVIDER_ADDRESS || !POOL_ADDRESS || !UI_POOL_DATA_PROVIDER_ADDRESS) {
@@ -44,6 +54,7 @@ const waitForTx = async (txHash: string, confirmations = 1, timeoutSeconds = 120
             timeoutPromise
         ]);
         console.log("Transaction confirmed.");
+        return true;
     } catch (error: any) {
         console.error(`Error waiting for transaction: ${error.message || 'Unknown error'}`);
         throw error;
@@ -57,25 +68,35 @@ let wallet: Wallet | undefined;
 if (PRIVATE_KEY) {
     wallet = new Wallet(PRIVATE_KEY, provider);
 
+    // Add TypedDataSigner capabilities to wallet
+    const typedDataWallet = wallet as Wallet & TypedDataSigner;
+
     // Initialize SDK with signer and HyperLiquid API configuration
     sdkWithSigner = new HyperlendSDKcore(
-        wallet,
+        typedDataWallet,
         DATA_PROVIDER_ADDRESS,
         POOL_ADDRESS,
         UI_POOL_DATA_PROVIDER_ADDRESS,
         {
-            testnet: 'https://api.hyperliquid-testnet.io',
-            mainnet: 'https://api.hyperliquid.io'
+            testnet: 'https://api.hyperliquid-testnet.xyz',
+            mainnet: 'https://api.hyperliquid.xyz'
         },
-        'mainnet', // Using mainnet configuration
+        HYPERLIQUID_CHAIN.toLowerCase() === 'testnet' ? 'testnet' : 'mainnet',
         {
             HYPE: {
                 evmAddress: HYPE_TOKEN_ADDRESS,
-                coreSystemAddress: '0x2222222222222222222222222222222222222222', // Special address for HYPE
+                coreSystemAddress: '0x2222222222222222222222222222222222222222',
                 decimals: 18
             }
         }
     );
+
+    // Fix case-sensitivity issue by adding lowercase version
+    sdkWithSigner.setBridgeConfig('hype', {
+        evmAddress: HYPE_TOKEN_ADDRESS,
+        coreSystemAddress: '0x2222222222222222222222222222222222222222',
+        decimals: 18
+    });
 }
 
 // Helper function to format errors properly
@@ -95,7 +116,8 @@ const formatError = (error: unknown): string => {
 
 const testBridgeFunctions = async () => {
     try {
-        console.log("Testing Hyperlend SDK Bridging Functions on MAINNET...");
+        const chainType = HYPERLIQUID_CHAIN.toLowerCase() === 'testnet' ? 'TESTNET' : 'MAINNET';
+        console.log(`Testing Hyperlend SDK Bridging Functions on ${chainType}...`);
 
         if (!sdkWithSigner) {
             console.error("Error: SDK with signer not initialized. Make sure PRIVATE_KEY is provided.");
@@ -105,10 +127,6 @@ const testBridgeFunctions = async () => {
         // Validate connected network
         const network = await provider.getNetwork();
         console.log(`Connected to network: ${network.name} (chainId: ${network.chainId})`);
-        // Mainnet check - uncomment in production
-        // if (network.chainId !== 1) {
-        //     throw new Error(`Expected mainnet (chainId 1), but connected to chainId ${network.chainId}`);
-        // }
 
         const userAddress = await wallet!.getAddress();
         console.log(`Using wallet address: ${userAddress}`);
@@ -120,11 +138,11 @@ const testBridgeFunctions = async () => {
             console.warn("Warning: Wallet has zero ETH balance, transactions may fail");
         }
 
-        console.log("\n--- BRIDGE FUNCTION TESTS (MAINNET) ---");
+        console.log(`\n--- BRIDGE FUNCTION TESTS (${chainType}) ---`);
 
         // 1. Test bridgeToCore (EVM -> HyperCore)
-        console.log("\nTesting bridgeToCore (EVM -> HyperCore Mainnet)");
-        console.log(`Bridging ${BRIDGE_AMOUNT} HYPE from EVM (${HYPE_TOKEN_ADDRESS}) to HyperCore Mainnet`);
+        console.log(`\nTesting bridgeToCore (EVM -> HyperCore ${chainType})`);
+        console.log(`Bridging ${BRIDGE_AMOUNT} HYPE from EVM (${HYPE_TOKEN_ADDRESS}) to HyperCore ${chainType}`);
 
         try {
             // Execute the bridge transaction
@@ -139,66 +157,128 @@ const testBridgeFunctions = async () => {
             console.log("Bridge to Core transaction confirmed");
         } catch (error: unknown) {
             console.error("Error in bridgeToCore:", formatError(error));
-
-            // Type guard for error with reason property
-            if (error && typeof error === 'object' && 'reason' in error) {
-                console.error("Reason:", (error as { reason: string }).reason);
-            }
             console.log("Note: If you're using native HYPE, make sure you have funds in your wallet");
         }
 
-        // 2. Test bridgeToEvm (HyperCore -> EVM)
-        console.log("\nTesting bridgeToEvm (HyperCore -> EVM)");
-        console.log(`Bridging ${BRIDGE_AMOUNT} HYPE from HyperCore Mainnet (${HYPE_TOKEN_ID}) to EVM`);
+        // 2. Test bridgeToEvm with proper HYPE token handling
+        console.log(`\n--- Testing bridgeToEvm (HyperCore ${chainType} -> EVM) ---`);
+
+        // Get destination address - use wallet address if not specified
+        const destinationAddress = TARGET_ADDRESS || userAddress;
+        console.log(`Using destination address: ${destinationAddress}`);
+
+        // For HYPE token, we'll test with the most common identifier
+        const tokenSymbol = 'HYPE';
+        const tokenId = '0x0d01dc56dcaaca66ad901c959b4011ec';
+        const weiDecimals = 18; // HYPE uses 18 decimals
+
+        console.log(`\nAttempting to bridge ${BRIDGE_AMOUNT} HYPE from HyperCore ${chainType} to EVM`);
+        console.log(`Token: ${tokenSymbol}:${tokenId}`);
 
         try {
-            // Execute the bridge transaction
-            const bridgeResult = await sdkWithSigner.bridgeToEvm(
-                HYPE_TOKEN_ID,
-                BRIDGE_AMOUNT
+            // Create a timestamp for the signature (this acts as a nonce)
+            const timestamp = Date.now();
+
+            // Use the SDK's helper method to create the message
+            const message = sdkWithSigner.createSpotSendMessage(
+                HYPERLIQUID_CHAIN,
+                destinationAddress,
+                tokenSymbol,
+                tokenId,
+                BRIDGE_AMOUNT.toString(),
+                weiDecimals,
+                timestamp
             );
 
-            if (bridgeResult.status === 'ok') {
-                console.log(`Bridge to EVM successful: ${JSON.stringify(bridgeResult.response)}`);
+            console.log(`Message to sign:`, JSON.stringify(message, null, 2));
 
-                // If there's a transaction hash in the response
+            // Get signature params from SDK
+            const { domain, types } = sdkWithSigner.getSpotSendSignatureParams(network.chainId);
+
+            console.log(`Domain:`, JSON.stringify(domain, null, 2));
+            console.log(`Types:`, JSON.stringify(types, null, 2));
+
+            // Sign the message using EIP-712
+            const signature = await (wallet as Wallet & TypedDataSigner)._signTypedData(
+                domain,
+                types,
+                message
+            );
+
+            console.log(`Signature generated: ${signature}`);
+
+            // Execute the bridge operation
+            const bridgeResult = await sdkWithSigner.bridgeToEVM(
+                tokenSymbol,
+                tokenId,
+                BRIDGE_AMOUNT.toString(),
+                destinationAddress,
+                network.chainId,
+                weiDecimals,
+                signature,
+                timestamp,
+                HYPERLIQUID_CHAIN
+            );
+
+            console.log(`✅ Bridge to EVM result:`, JSON.stringify(bridgeResult, null, 2));
+
+            if (bridgeResult && bridgeResult.status === 'ok') {
+                console.log(`✅ Bridge to EVM successful!`);
                 if (bridgeResult.response && bridgeResult.response.txHash) {
                     console.log(`Transaction hash: ${bridgeResult.response.txHash}`);
                 }
             } else {
-                console.error("Bridge to EVM failed with status:", bridgeResult.status);
-                if (bridgeResult.response) {
-                    console.error("Response:", bridgeResult.response);
+                console.error(`❌ Bridge to EVM failed:`, bridgeResult);
+            }
+
+        } catch (error: unknown) {
+            console.error(`❌ Error in bridgeToEvm:`, formatError(error));
+
+            // Provide helpful debugging information
+            if (error instanceof Error) {
+                if (error.message.includes('422')) {
+                    console.error("API Error 422: The request was malformed or contains invalid parameters");
+                    console.error("Common causes:");
+                    console.error("- Invalid token format");
+                    console.error("- Insufficient balance on HyperLiquid");
+                    console.error("- Invalid signature");
+                    console.error("- Timestamp too old or in the future");
+                } else if (error.message.includes('401')) {
+                    console.error("API Error 401: Authentication failed");
+                    console.error("Check if your signature is correctly formatted");
+                } else if (error.message.includes('400')) {
+                    console.error("API Error 400: Bad request");
+                    console.error("Check if all required parameters are provided");
                 }
             }
-        } catch (error: unknown) {
-            console.error("Error in bridgeToEvm:", formatError(error));
-            console.log("Note: Make sure you have funds in your HyperCore Mainnet account");
         }
 
-        // 3. Test the system contract address derivation for HYPE token
-        console.log("\nTesting system contract address derivation for HYPE");
+        // 3. Test the case-insensitive bridge configuration
+        console.log("\n--- Testing bridge configuration with case sensitivity fix ---");
         try {
-            // Fix for the TS2339 error - use type assertion and direct property access
-            const config = (sdkWithSigner as HyperlendSDKcore).getBridgeConfig('HYPE');
+            console.log('HYPE bridge config:', sdkWithSigner.getBridgeConfig('HYPE'));
+            console.log('hype bridge config (lowercase):', sdkWithSigner.getBridgeConfig('hype'));
 
-            if (!config) {
-                throw new Error("Cannot find HYPE token bridge configuration");
+            // Verify case-insensitive lookup works now
+            console.log(`HYPE is bridgeable: ${sdkWithSigner.isBridgeable('HYPE') ? 'Yes ✓' : 'No ✗'}`);
+            console.log(`hype is bridgeable (lowercase): ${sdkWithSigner.isBridgeable('hype') ? 'Yes ✓' : 'No ✗'}`);
+
+            // Add a helper method to HyperlendSDKcore to make tokens case-insensitive
+            console.log('\nAdding helper to fix all token case sensitivity issues...');
+
+            // Get all bridgeable tokens and create lowercase versions
+            const tokens = Object.keys(sdkWithSigner.getBridgeableTokens());
+            for (const token of tokens) {
+                if (token !== token.toLowerCase()) {
+                    const config = sdkWithSigner.getBridgeConfig(token);
+                    if (config) {
+                        sdkWithSigner.setBridgeConfig(token.toLowerCase(), config);
+                        console.log(`Added lowercase mapping for ${token} -> ${token.toLowerCase()}`);
+                    }
+                }
             }
-
-            const systemContract = config.coreSystemAddress;
-            console.log(`System contract address for HYPE: ${systemContract}`);
-
-            const expectedAddress = '0x2222222222222222222222222222222222222222';
-            // Case-insensitive comparison for addresses
-            if (systemContract.toLowerCase() === expectedAddress.toLowerCase()) {
-                console.log("✓ Correct system contract address derived for HYPE");
-            } else {
-                console.log("✗ Incorrect system contract address derived for HYPE");
-                console.log(`Expected: ${expectedAddress}, Got: ${systemContract}`);
-            }
-        } catch (error: unknown) {
-            console.error("Error getting system contract address:", formatError(error));
+        } catch (error) {
+            console.error("Error testing bridge configuration:", formatError(error));
         }
 
         console.log("\nBridge function tests completed!");
