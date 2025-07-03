@@ -716,6 +716,10 @@ export class HyperlendSDKcore {
                 // For native HYPE token, use 18 decimals by default
                 amountInWei = utils.parseUnits(amount.toString(), 18);
 
+                if (systemContract != '0x2222222222222222222222222222222222222222'){
+                    throw new Error(`systemContract 0x222...222 expected for native HYPE`); //add extra check
+                }
+
                 // Send native transaction instead of token transfer
                 const tx = await signer.sendTransaction({
                     to: systemContract,
@@ -725,6 +729,10 @@ export class HyperlendSDKcore {
                 await tx.wait(1);
                 console.log('Native token transfer to system contract complete');
                 return {txHash: tx.hash};
+            }
+
+            if (tokenAddress == '0x5555555555555555555555555555555555555555'){
+                throw new Error('wrapped hype is not bridgeable');
             }
 
             // Create contract instance for non-native tokens
@@ -1014,7 +1022,7 @@ export class HyperlendSDKcore {
      */
     private getSystemContractAddressFromTokenIndex(tokenIndex: number): string {
         // Special case for HYPE with index 0 or 150
-        if (tokenIndex === 0 || tokenIndex === 150) {
+        if (tokenIndex === 150) {
             return '0x2222222222222222222222222222222222222222';
         }
 
